@@ -39,6 +39,11 @@ def test_load_settings_applies_artifact_directory_defaults(
     assert settings.inference.model_source == "local_artifact"
     assert settings.inference.prediction_threshold == 0.5
     assert settings.inference.port == 8000
+    assert settings.orchestration.workspace_dir == (
+        tmp_path / "artifacts" / "orchestration"
+    ).resolve()
+    assert settings.orchestration.airflow.dag_id == "churnops_training_pipeline"
+    assert settings.orchestration.airflow.schedule is None
 
 
 def test_apply_runtime_overrides_resolves_relative_dataset_paths(
@@ -88,6 +93,13 @@ def test_apply_runtime_overrides_reads_environment_variables(
             "CHURNOPS_INFERENCE_PRELOAD_MODEL": "false",
             "CHURNOPS_INFERENCE_HOST": "0.0.0.0",
             "CHURNOPS_INFERENCE_PORT": "8010",
+            "CHURNOPS_ORCHESTRATION_WORKSPACE_DIR": "runtime/orchestration",
+            "CHURNOPS_AIRFLOW_DAG_ID": "custom-training-dag",
+            "CHURNOPS_AIRFLOW_SCHEDULE": "0 0 * * *",
+            "CHURNOPS_AIRFLOW_CATCHUP": "true",
+            "CHURNOPS_AIRFLOW_MAX_ACTIVE_RUNS": "2",
+            "CHURNOPS_AIRFLOW_RETRIES": "3",
+            "CHURNOPS_AIRFLOW_RETRY_DELAY_MINUTES": "15",
         },
     )
 
@@ -105,6 +117,15 @@ def test_apply_runtime_overrides_reads_environment_variables(
     assert overridden.inference.preload_model is False
     assert overridden.inference.host == "0.0.0.0"
     assert overridden.inference.port == 8010
+    assert overridden.orchestration.workspace_dir == (
+        tmp_path / "runtime" / "orchestration"
+    ).resolve()
+    assert overridden.orchestration.airflow.dag_id == "custom-training-dag"
+    assert overridden.orchestration.airflow.schedule == "0 0 * * *"
+    assert overridden.orchestration.airflow.catchup is True
+    assert overridden.orchestration.airflow.max_active_runs == 2
+    assert overridden.orchestration.airflow.retries == 3
+    assert overridden.orchestration.airflow.retry_delay_minutes == 15
 
 
 def test_ensure_runtime_directories_creates_tracking_and_artifact_paths(
@@ -130,6 +151,7 @@ def test_ensure_runtime_directories_creates_tracking_and_artifact_paths(
 
     assert (tmp_path / "artifacts").exists()
     assert (tmp_path / "artifacts" / "training").exists()
+    assert (tmp_path / "artifacts" / "orchestration").exists()
     assert (tmp_path / "runtime" / "mlflow").exists()
     assert (tmp_path / "runtime" / "mlflow" / "artifacts").exists()
 

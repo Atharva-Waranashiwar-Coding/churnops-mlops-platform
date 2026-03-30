@@ -141,3 +141,17 @@ inference:
   preload_model: true
   host: 0.0.0.0
   port: 8000
+
+orchestration:
+  workspace_dir: artifacts/orchestration
+  airflow:
+    dag_id: churnops_training_pipeline
+    schedule: "0 3 * * 1"
+    start_date: "2024-01-01T00:00:00+00:00"
+    catchup: false
+    max_active_runs: 1
+    retries: 1
+    retry_delay_minutes: 5
+    tags:
+      - churnops
+      - retraining
