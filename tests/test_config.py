@@ -32,6 +32,9 @@ def test_load_settings_applies_artifact_directory_defaults(
     assert settings.tracking.tracking_uri == _sqlite_uri(tmp_path / "artifacts" / "mlflow" / "mlflow.db")
     assert settings.tracking.registry_uri == settings.tracking.tracking_uri
     assert settings.tracking.artifact_location == (tmp_path / "artifacts" / "mlflow" / "artifacts").resolve().as_uri()
+    assert settings.inference.model_source == "local_artifact"
+    assert settings.inference.prediction_threshold == 0.5
+    assert settings.inference.port == 8000
 
 
 def test_apply_runtime_overrides_resolves_relative_dataset_paths(
@@ -85,6 +88,15 @@ def test_load_settings_resolves_tracking_configuration(
                 "greater_is_better": True,
             },
         },
+        inference={
+            "model_source": "mlflow_registry",
+            "registered_model_name": "churnops-model",
+            "registered_model_alias": "champion",
+            "prediction_threshold": 0.65,
+            "preload_model": False,
+            "host": "127.0.0.1",
+            "port": 9000,
+        },
     )
 
     settings = load_settings(config_path)
@@ -108,6 +120,13 @@ def test_load_settings_resolves_tracking_configuration(
     assert settings.tracking.model_registry.model_name == "churnops-model"
     assert settings.tracking.model_registry.comparison_metric == "roc_auc"
     assert settings.tracking.model_registry.comparison_split == "test"
+    assert settings.inference.model_source == "mlflow_registry"
+    assert settings.inference.registered_model_name == "churnops-model"
+    assert settings.inference.registered_model_alias == "champion"
+    assert settings.inference.prediction_threshold == 0.65
+    assert settings.inference.preload_model is False
+    assert settings.inference.host == "127.0.0.1"
+    assert settings.inference.port == 9000
 
 
 def _write_training_config(
@@ -115,6 +134,7 @@ def _write_training_config(
     churn_fixture_path,
     dataset_config,
     tracking: dict | None = None,
+    inference: dict | None = None,
 ) -> Path:
     """Create a minimal training config for configuration-focused tests."""
 
@@ -158,6 +178,7 @@ def _write_training_config(
                     "training_runs_dir": "training",
                 },
                 **({"tracking": tracking} if tracking is not None else {}),
+                **({"inference": inference} if inference is not None else {}),
             },
             sort_keys=False,
         ),
