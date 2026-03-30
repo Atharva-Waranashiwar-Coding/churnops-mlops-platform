@@ -12,7 +12,12 @@ from churnops.config.models import (
     SplitConfig,
     TrackingConfig,
 )
-from churnops.config.runtime import apply_runtime_overrides
+from churnops.config.runtime import (
+    apply_runtime_overrides,
+    ensure_runtime_directories,
+    get_default_config_path,
+    load_runtime_settings,
+)
 
 __all__ = [
     "ArtifactConfig",
@@ -25,5 +30,8 @@ __all__ = [
     "SplitConfig",
     "TrackingConfig",
     "apply_runtime_overrides",
+    "ensure_runtime_directories",
+    "get_default_config_path",
+    "load_runtime_settings",
     "load_settings",
 ]

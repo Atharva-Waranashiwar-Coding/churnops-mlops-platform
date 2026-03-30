@@ -15,24 +15,27 @@ import uvicorn
 
 from churnops import __version__
 from churnops.api.routes import router
-from churnops.config import Settings, load_settings
+from churnops.config import Settings, get_default_config_path, load_runtime_settings
 from churnops.inference import InferenceService
 from churnops.inference.exceptions import InferenceError, ModelLoadError, PredictionError
 
 LOGGER = logging.getLogger(__name__)
 
 
-def create_app(config_path: str | Path = "configs/base.yaml") -> FastAPI:
+def create_app(
+    config_path: str | Path | None = None,
+    settings: Settings | None = None,
+) -> FastAPI:
     """Create the FastAPI application for churn inference."""
 
-    settings = load_settings(config_path)
+    resolved_settings = settings or load_runtime_settings(config_path)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        service = InferenceService(settings)
-        app.state.settings = settings
+        service = InferenceService(resolved_settings)
+        app.state.settings = resolved_settings
         app.state.inference_service = service
-        if settings.inference.preload_model:
+        if resolved_settings.inference.preload_model:
             try:
                 service.preload_model()
             except ModelLoadError:
@@ -55,7 +58,7 @@ def build_argument_parser() -> ArgumentParser:
     parser = ArgumentParser(description="Run the ChurnOps inference API.")
     parser.add_argument(
         "--config",
-        default="configs/base.yaml",
+        default=get_default_config_path(),
         help="Path to the YAML configuration file.",
     )
     return parser
@@ -72,9 +75,9 @@ def main() -> int:
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
 
-    settings = load_settings(args.config)
+    settings = load_runtime_settings(args.config)
     uvicorn.run(
-        create_app(args.config),
+        create_app(settings=settings),
         host=settings.inference.host,
         port=settings.inference.port,
         log_level="info",
