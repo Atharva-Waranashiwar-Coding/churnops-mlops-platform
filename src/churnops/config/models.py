@@ -126,6 +126,58 @@ class TrackingConfig:
 
 
 @dataclass(slots=True)
+class InferenceConfig:
+    """Inference service settings for model loading and API execution."""
+
+    model_source: str = "local_artifact"
+    local_model_path: Path | None = None
+    local_run_id: str | None = None
+    model_uri: str | None = None
+    registered_model_name: str | None = None
+    registered_model_alias: str | None = None
+    registered_model_version: str | None = None
+    prediction_threshold: float = 0.5
+    preload_model: bool = True
+    host: str = "0.0.0.0"
+    port: int = 8000
+
+    def __post_init__(self) -> None:
+        """Validate inference settings after deserialization."""
+
+        valid_sources = {"local_artifact", "mlflow_model_uri", "mlflow_registry"}
+        if self.model_source not in valid_sources:
+            raise ValueError(
+                "inference.model_source must be one of: "
+                + ", ".join(sorted(valid_sources))
+                + "."
+            )
+        if not 0 <= self.prediction_threshold <= 1:
+            raise ValueError("inference.prediction_threshold must be between 0 and 1.")
+        if not 1 <= self.port <= 65535:
+            raise ValueError("inference.port must be between 1 and 65535.")
+        if self.local_model_path is not None and self.local_run_id is not None:
+            raise ValueError(
+                "Configure either inference.local_model_path or inference.local_run_id, not both."
+            )
+        if self.model_source == "mlflow_model_uri" and not self.model_uri:
+            raise ValueError(
+                "inference.model_uri must be set when inference.model_source is "
+                "'mlflow_model_uri'."
+            )
+        if self.model_source == "mlflow_registry":
+            if not self.registered_model_name:
+                raise ValueError(
+                    "inference.registered_model_name must be set when inference.model_source "
+                    "is 'mlflow_registry'."
+                )
+            if bool(self.registered_model_alias) == bool(self.registered_model_version):
+                raise ValueError(
+                    "Configure exactly one of inference.registered_model_alias or "
+                    "inference.registered_model_version for 'mlflow_registry' inference."
+                )
+
+
+@dataclass(slots=True)
 class Settings:
     """Top-level application settings for a training run."""
 
@@ -135,4 +187,5 @@ class Settings:
     model: ModelConfig
     artifacts: ArtifactConfig
     tracking: TrackingConfig
+    inference: InferenceConfig
     config_path: Path
