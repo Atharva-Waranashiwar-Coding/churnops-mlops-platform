@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import inspect
 from contextlib import contextmanager
 from datetime import datetime, timezone
-import inspect
 from typing import Any, Iterator
 
 from churnops.config import ModelRegistryConfig, Settings
@@ -296,7 +296,9 @@ class MLflowTrainingTracker:
     ) -> float | None:
         """Extract the configured comparison metric from the evaluation result."""
 
-        split_metrics = completed_run.evaluation_result.metrics.get(registry_config.comparison_split)
+        split_metrics = completed_run.evaluation_result.metrics.get(
+            registry_config.comparison_split
+        )
         if split_metrics is None:
             return None
 

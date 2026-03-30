@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from argparse import ArgumentParser
 from contextlib import asynccontextmanager
-import logging
 from pathlib import Path
 
-from fastapi.encoders import jsonable_encoder
+import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-import uvicorn
 
 from churnops import __version__
 from churnops.api.routes import router

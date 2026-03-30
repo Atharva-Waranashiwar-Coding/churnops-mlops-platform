@@ -59,7 +59,8 @@ def main() -> int:
         pipeline_result = run_training(args.config, data_path=args.data_path)
     except FileNotFoundError as error:
         LOGGER.error(
-            "%s. Place a churn CSV at that path or rerun with --data-path /path/to/customer_churn.csv.",
+            "%s. Place a churn CSV at that path or rerun with "
+            "--data-path /path/to/customer_churn.csv.",
             error,
         )
         return 1

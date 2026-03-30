@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import shutil
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-import json
 from pathlib import Path
-import shutil
 
 import joblib
 
@@ -39,7 +39,9 @@ def persist_training_run(
 
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     run_directory = settings.artifacts.root_dir / settings.artifacts.training_runs_dir / run_id
-    model_path = run_directory / settings.artifacts.model_directory / settings.artifacts.model_filename
+    model_path = (
+        run_directory / settings.artifacts.model_directory / settings.artifacts.model_filename
+    )
     metrics_path = (
         run_directory / settings.artifacts.metrics_directory / settings.artifacts.metrics_filename
     )
