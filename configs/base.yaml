@@ -106,7 +106,12 @@ model:
 artifacts:
   root_dir: artifacts
   training_runs_dir: training
+  model_directory: model
   model_filename: model.joblib
+  metrics_directory: metrics
   metrics_filename: metrics.json
-  metadata_filename: metadata.json
-  config_snapshot_filename: config.yaml
+  metadata_directory: metadata
+  metadata_filename: run.json
+  validation_report_filename: validation.json
+  config_directory: config
+  config_snapshot_filename: training.yaml

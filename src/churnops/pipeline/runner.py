@@ -45,11 +45,9 @@ def run_local_training(settings: Settings) -> TrainingPipelineResult:
     evaluation_result = evaluate_model_splits(trained_model.model_pipeline, data_splits)
     persisted_run = persist_training_run(
         settings=settings,
-        model_pipeline=trained_model.model_pipeline,
-        metrics=evaluation_result.metrics,
-        split_sizes=evaluation_result.split_sizes,
-        feature_spec=trained_model.feature_spec,
-        source_row_count=validation_report.row_count,
+        trained_model=trained_model,
+        evaluation_result=evaluation_result,
+        validation_report=validation_report,
     )
     return TrainingPipelineResult(
         validation_report=validation_report,

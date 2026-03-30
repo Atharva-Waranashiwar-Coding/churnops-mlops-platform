@@ -68,18 +68,21 @@ def test_run_training_persists_model_metrics_and_metadata(
 
     pipeline_result = run_training(config_path)
 
-    model_path = pipeline_result.persisted_run.run_directory / "model.joblib"
-    metrics_path = pipeline_result.persisted_run.run_directory / "metrics.json"
-    metadata_path = pipeline_result.persisted_run.run_directory / "metadata.json"
-    config_snapshot_path = pipeline_result.persisted_run.run_directory / "config.yaml"
+    model_path = pipeline_result.persisted_run.model_path
+    metrics_path = pipeline_result.persisted_run.metrics_path
+    metadata_path = pipeline_result.persisted_run.metadata_path
+    validation_report_path = pipeline_result.persisted_run.validation_report_path
+    config_snapshot_path = pipeline_result.persisted_run.config_snapshot_path
 
     assert model_path.exists()
     assert metrics_path.exists()
     assert metadata_path.exists()
+    assert validation_report_path.exists()
     assert config_snapshot_path.exists()
 
     metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    validation_report = json.loads(validation_report_path.read_text(encoding="utf-8"))
 
     assert set(metrics.keys()) == {"train", "validation", "test"}
     assert 0.0 <= metrics["test"]["accuracy"] <= 1.0
@@ -87,6 +90,9 @@ def test_run_training_persists_model_metrics_and_metadata(
     assert metadata["split_sizes"] == {"train": 12, "validation": 6, "test": 6}
     assert pipeline_result.evaluation_result.metrics["test"]["f1"] == metrics["test"]["f1"]
     assert pipeline_result.validation_report.row_count == 24
+    assert metadata["artifacts"]["model_path"] == "model/model.joblib"
+    assert validation_report["row_count"] == 24
+    assert validation_report["target_distribution"] == {"No": 12, "Yes": 12}
 
     persisted_model = joblib.load(model_path)
     sample_frame = pd.read_csv(churn_fixture_path).drop(columns=["customerID", "Churn"]).head(3)
@@ -154,4 +160,4 @@ def test_run_training_allows_runtime_dataset_path_override(
     pipeline_result = run_training(config_path, data_path=churn_fixture_path)
 
     assert pipeline_result.evaluation_result.metrics["test"]["accuracy"] is not None
-    assert (pipeline_result.persisted_run.run_directory / "model.joblib").exists()
+    assert pipeline_result.persisted_run.model_path.exists()
