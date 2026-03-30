@@ -146,6 +146,40 @@ def test_prediction_endpoint_returns_503_when_model_is_missing(
     assert prediction_response.status_code == 503
 
 
+def test_create_app_uses_environment_driven_config_and_model_path(
+    monkeypatch,
+    dataset_config,
+    churn_fixture_path,
+    tmp_path,
+) -> None:
+    """Container-style env configuration should drive app startup without explicit CLI args."""
+
+    config_path = _write_inference_config(
+        tmp_path=tmp_path,
+        churn_fixture_path=churn_fixture_path,
+        dataset_config=dataset_config,
+        inference_override={
+            "preload_model": False,
+        },
+    )
+    pipeline_result = run_training(config_path)
+
+    monkeypatch.setenv("CHURNOPS_CONFIG", str(config_path))
+    monkeypatch.setenv(
+        "CHURNOPS_INFERENCE_LOCAL_MODEL_PATH",
+        str(pipeline_result.persisted_run.model_path),
+    )
+    monkeypatch.setenv("CHURNOPS_INFERENCE_PRELOAD_MODEL", "true")
+
+    with TestClient(create_app()) as client:
+        response = client.get("/health")
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["status"] == "ok"
+    assert payload["model_loaded"] is True
+
+
 def _build_prediction_payload(churn_fixture_path: Path, row_count: int) -> list[dict[str, object]]:
     """Build a prediction payload from the churn fixture without target or ID fields."""
 
