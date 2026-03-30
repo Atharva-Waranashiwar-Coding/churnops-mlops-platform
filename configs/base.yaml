@@ -1,0 +1,80 @@
+project:
+  name: churnops
+  root_dir: ..
+
+data:
+  raw_data_path: data/raw/customer_churn.csv
+  target_column: Churn
+  positive_class: "Yes"
+  id_columns:
+    - customerID
+  drop_columns: []
+  required_columns:
+    - customerID
+    - gender
+    - SeniorCitizen
+    - Partner
+    - Dependents
+    - tenure
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+    - MonthlyCharges
+    - TotalCharges
+    - Churn
+  numeric_features:
+    - tenure
+    - MonthlyCharges
+    - TotalCharges
+  categorical_features:
+    - gender
+    - SeniorCitizen
+    - Partner
+    - Dependents
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+  numeric_coercion_columns:
+    - TotalCharges
+  na_values:
+    - ""
+    - " "
+
+split:
+  test_size: 0.2
+  validation_size: 0.1
+  random_state: 42
+
+model:
+  name: logistic_regression
+  params:
+    C: 1.0
+    class_weight: balanced
+    max_iter: 1000
+    solver: lbfgs
+
+artifacts:
+  root_dir: artifacts
+  training_runs_dir: training
+  model_filename: model.joblib
+  metrics_filename: metrics.json
+  metadata_filename: metadata.json
+  config_snapshot_filename: config.yaml
