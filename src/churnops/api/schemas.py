@@ -33,7 +33,7 @@ class ChurnPredictionInput(BaseModel):
     PaperlessBilling: NonEmptyString
     PaymentMethod: NonEmptyString
     MonthlyCharges: Annotated[float, Field(ge=0)]
-    TotalCharges: float | None = None
+    TotalCharges: Annotated[float | None, Field(ge=0)] = None
 
     @field_validator("TotalCharges", mode="before")
     @classmethod

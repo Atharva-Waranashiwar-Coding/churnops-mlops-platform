@@ -110,7 +110,10 @@ def test_prediction_endpoint_rejects_invalid_total_charges(
     with TestClient(create_app(config_path)) as client:
         response = client.post("/v1/predictions", json=payload)
 
+    validation_payload = response.json()
     assert response.status_code == 422
+    assert validation_payload["detail"] == "Request validation failed."
+    assert validation_payload["errors"][0]["loc"][-1] == "TotalCharges"
 
 
 def test_prediction_endpoint_returns_503_when_model_is_missing(
