@@ -28,6 +28,10 @@ def test_load_settings_applies_artifact_directory_defaults(
     assert settings.artifacts.metrics_directory == "metrics"
     assert settings.artifacts.metadata_directory == "metadata"
     assert settings.artifacts.config_directory == "config"
+    assert settings.tracking.enabled is False
+    assert settings.tracking.tracking_uri == _sqlite_uri(tmp_path / "artifacts" / "mlflow" / "mlflow.db")
+    assert settings.tracking.registry_uri == settings.tracking.tracking_uri
+    assert settings.tracking.artifact_location == (tmp_path / "artifacts" / "mlflow" / "artifacts").resolve().as_uri()
 
 
 def test_apply_runtime_overrides_resolves_relative_dataset_paths(
@@ -50,7 +54,68 @@ def test_apply_runtime_overrides_resolves_relative_dataset_paths(
     assert overridden.project.root_dir == settings.project.root_dir
 
 
-def _write_training_config(tmp_path, churn_fixture_path, dataset_config) -> Path:
+def test_load_settings_resolves_tracking_configuration(
+    dataset_config,
+    churn_fixture_path,
+    tmp_path,
+) -> None:
+    """Tracking config should resolve local paths into MLflow-compatible URIs."""
+
+    config_path = _write_training_config(
+        tmp_path=tmp_path,
+        churn_fixture_path=churn_fixture_path,
+        dataset_config=dataset_config,
+        tracking={
+            "enabled": True,
+            "experiment_name": "churnops-exp",
+            "tracking_uri": "sqlite:///tracking/backend/mlflow.db",
+            "registry_uri": "sqlite:///tracking/registry/mlflow.db",
+            "artifact_location": "tracking/artifacts",
+            "run_name_prefix": "baseline",
+            "model_artifact_path": "served_model",
+            "local_artifacts_path": "reports",
+            "tags": {
+                "environment": "test",
+            },
+            "model_registry": {
+                "enabled": True,
+                "model_name": "churnops-model",
+                "comparison_metric": "roc_auc",
+                "comparison_split": "test",
+                "greater_is_better": True,
+            },
+        },
+    )
+
+    settings = load_settings(config_path)
+
+    assert settings.tracking.enabled is True
+    assert settings.tracking.experiment_name == "churnops-exp"
+    assert settings.tracking.tracking_uri == _sqlite_uri(
+        tmp_path / "tracking" / "backend" / "mlflow.db"
+    )
+    assert settings.tracking.registry_uri == _sqlite_uri(
+        tmp_path / "tracking" / "registry" / "mlflow.db"
+    )
+    assert settings.tracking.artifact_location == (
+        tmp_path / "tracking" / "artifacts"
+    ).resolve().as_uri()
+    assert settings.tracking.run_name_prefix == "baseline"
+    assert settings.tracking.model_artifact_path == "served_model"
+    assert settings.tracking.local_artifacts_path == "reports"
+    assert settings.tracking.tags == {"environment": "test"}
+    assert settings.tracking.model_registry.enabled is True
+    assert settings.tracking.model_registry.model_name == "churnops-model"
+    assert settings.tracking.model_registry.comparison_metric == "roc_auc"
+    assert settings.tracking.model_registry.comparison_split == "test"
+
+
+def _write_training_config(
+    tmp_path,
+    churn_fixture_path,
+    dataset_config,
+    tracking: dict | None = None,
+) -> Path:
     """Create a minimal training config for configuration-focused tests."""
 
     config_path = tmp_path / "training.yaml"
@@ -92,9 +157,16 @@ def _write_training_config(tmp_path, churn_fixture_path, dataset_config) -> Path
                     "root_dir": "artifacts",
                     "training_runs_dir": "training",
                 },
+                **({"tracking": tracking} if tracking is not None else {}),
             },
             sort_keys=False,
         ),
         encoding="utf-8",
     )
     return config_path
+
+
+def _sqlite_uri(path: Path) -> str:
+    """Return an absolute SQLite URI for a local MLflow metadata database."""
+
+    return f"sqlite:///{path.resolve()}"

@@ -93,6 +93,7 @@ def test_run_training_persists_model_metrics_and_metadata(
     assert metadata["artifacts"]["model_path"] == "model/model.joblib"
     assert validation_report["row_count"] == 24
     assert validation_report["target_distribution"] == {"No": 12, "Yes": 12}
+    assert pipeline_result.tracking_result.enabled is False
 
     persisted_model = joblib.load(model_path)
     sample_frame = pd.read_csv(churn_fixture_path).drop(columns=["customerID", "Churn"]).head(3)
@@ -161,3 +162,4 @@ def test_run_training_allows_runtime_dataset_path_override(
 
     assert pipeline_result.evaluation_result.metrics["test"]["accuracy"] is not None
     assert pipeline_result.persisted_run.model_path.exists()
+    assert pipeline_result.tracking_result.enabled is False
