@@ -1,14 +1,14 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 02 extends the local baseline into a more modular training architecture with centralized configuration, explicit validation, clearer orchestration boundaries, and a standardized artifact layout for future experiment tracking.
+ChurnOps is a production-style MLOps project for customer churn prediction. Phase 03 extends the modular baseline with MLflow-backed experiment tracking, structured run logging, and a gated model registry workflow that stays compatible with future deployment automation.
 
-## Phase 02 Scope
+## Phase 03 Scope
 
-- keep the working baseline training flow intact while refactoring it into modular pipeline stages
-- validate the raw dataset contract before preprocessing
-- centralize configuration loading and runtime overrides
-- separate preprocessing, training, evaluation, and orchestration responsibilities
-- standardize local run outputs for future MLflow-style integration
+- keep the modular training pipeline from Phase 02 intact
+- track training runs in MLflow without leaking tracking code into preprocessing or model modules
+- log searchable parameters, per-split metrics, model artifacts, and evaluation outputs
+- register only the best model version according to a configurable comparison rule
+- keep tracking and registry settings externalized so local and remote backends can be swapped later
 
 ## Repository Layout
 
@@ -27,7 +27,8 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 │       ├── data/             # dataset ingestion and validation
 │       ├── features/         # preprocessing and dataset splitting
 │       ├── models/           # estimator training and metrics
-│       └── pipeline/         # runner orchestration and CLI entrypoint
+│       ├── pipeline/         # runner orchestration and CLI entrypoint
+│       └── tracking/         # tracker interface and MLflow implementation
 └── tests/                    # unit and integration tests
 ```
 
@@ -50,7 +51,7 @@ The default configuration expects a telecom churn CSV at `data/raw/customer_chur
 
 At ingestion time, those raw headers are renamed into a stable internal schema such as `customerID`, `tenure`, `MonthlyCharges`, `TotalCharges`, and `Churn`. The target column is `Churn`, the positive class is `Yes`, and `customerID` is excluded from modeling.
 
-If your dataset lives elsewhere or uses different split ratios or model settings, copy `configs/base.yaml` and update the path and parameters there.
+If your dataset lives elsewhere or uses different split ratios, model settings, or tracking backends, copy `configs/base.yaml` and update the relevant sections there.
 
 ## Local Training
 
@@ -86,6 +87,27 @@ On success, the pipeline writes a timestamped run directory under `artifacts/tra
 - `metadata/validation.json`: raw dataset validation summary
 - `config/training.yaml`: snapshot of the resolved training config
 
+## Experiment Tracking
+
+The default configuration also enables MLflow with a local SQLite-backed metadata store at `artifacts/mlflow/mlflow.db`. Every successful training run opens an MLflow run, logs searchable parameters and per-split metrics, records the full local run bundle as artifacts, and logs an MLflow-native sklearn model artifact for downstream serving workflows.
+
+Tracking settings live under the `tracking:` section in the YAML config. The important knobs are:
+
+- `tracking.enabled`: enable or disable experiment tracking without changing pipeline code
+- `tracking.experiment_name`: MLflow experiment name for training runs
+- `tracking.tracking_uri`: local SQLite URI or remote MLflow tracking backend URI
+- `tracking.registry_uri`: model registry backend URI; defaults to the tracking backend
+- `tracking.artifact_location`: where MLflow should write tracked run artifacts
+- `tracking.model_registry.*`: model registration policy, including the comparison split and metric
+
+The registry flow is gated. ChurnOps only registers a new model version when the current run beats the incumbent registered version on the configured comparison metric. The default rule uses validation-set `f1`.
+
+To inspect the local MLflow store with the UI:
+
+```bash
+mlflow ui --backend-store-uri sqlite:///artifacts/mlflow/mlflow.db
+```
+
 ## Training Flow
 
 The local training runner executes these stages:
@@ -94,7 +116,8 @@ The local training runner executes these stages:
 2. validate the dataset contract and target availability
 3. prepare features and targets, then split train/validation/test data
 4. train the configured baseline estimator
-5. evaluate each split and persist a structured training run
+5. evaluate each split and persist a structured local training run
+6. track the run in MLflow and register the model if it is the current best candidate
 
 ## Running Tests
 
@@ -107,6 +130,7 @@ make test
 - `src/` package layout keeps the codebase ready for packaging, CI, Docker, and service integration.
 - configuration loading, settings models, and runtime overrides are centralized under `churnops.config`.
 - the pipeline runner is orchestration-only; domain logic stays in dedicated validation, preprocessing, training, and evaluation modules.
+- experiment tracking is isolated under `churnops.tracking`, so the rest of the codebase stays MLflow-agnostic.
 - the feature contract is explicit by default, which prevents accidental training on unexpected or leakage-prone columns.
 - the persisted model artifact is a full sklearn pipeline, which keeps future FastAPI inference integration straightforward.
-- run outputs are grouped by type so later MLflow integration can wrap the existing layout instead of replacing it.
+- the MLflow registry flow is metric-driven and can be repointed to a remote backend without changing pipeline orchestration.
