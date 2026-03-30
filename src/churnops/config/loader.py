@@ -10,6 +10,7 @@ import yaml
 from churnops.config.models import (
     ArtifactConfig,
     DatasetConfig,
+    InferenceConfig,
     ModelConfig,
     ModelRegistryConfig,
     ProjectConfig,
@@ -38,6 +39,7 @@ def load_settings(config_path: str | Path) -> Settings:
     model_section = _as_mapping(raw_settings.get("model", {}), "model")
     artifacts_section = _as_mapping(raw_settings.get("artifacts", {}), "artifacts")
     tracking_section = _as_mapping(raw_settings.get("tracking", {}), "tracking")
+    inference_section = _as_mapping(raw_settings.get("inference", {}), "inference")
 
     project_root = Path(project_section.get("root_dir", "."))
     if not project_root.is_absolute():
@@ -149,6 +151,47 @@ def load_settings(config_path: str | Path) -> Settings:
             ),
         ),
     )
+    inference = InferenceConfig(
+        model_source=str(inference_section.get("model_source", "local_artifact")),
+        local_model_path=(
+            _resolve_path(project.root_dir, inference_section["local_model_path"])
+            if inference_section.get("local_model_path") is not None
+            else None
+        ),
+        local_run_id=(
+            str(inference_section["local_run_id"])
+            if inference_section.get("local_run_id") is not None
+            else None
+        ),
+        model_uri=(
+            str(inference_section["model_uri"])
+            if inference_section.get("model_uri") is not None
+            else None
+        ),
+        registered_model_name=(
+            str(inference_section["registered_model_name"])
+            if inference_section.get("registered_model_name") is not None
+            else (
+                str(model_registry_section["model_name"])
+                if model_registry_section.get("model_name") is not None
+                else None
+            )
+        ),
+        registered_model_alias=(
+            str(inference_section["registered_model_alias"])
+            if inference_section.get("registered_model_alias") is not None
+            else None
+        ),
+        registered_model_version=(
+            str(inference_section["registered_model_version"])
+            if inference_section.get("registered_model_version") is not None
+            else None
+        ),
+        prediction_threshold=float(inference_section.get("prediction_threshold", 0.5)),
+        preload_model=bool(inference_section.get("preload_model", True)),
+        host=str(inference_section.get("host", "0.0.0.0")),
+        port=int(inference_section.get("port", 8000)),
+    )
 
     return Settings(
         project=project,
@@ -157,6 +200,7 @@ def load_settings(config_path: str | Path) -> Settings:
         model=model,
         artifacts=artifacts,
         tracking=tracking,
+        inference=inference,
         config_path=resolved_config_path,
     )
 

@@ -4,6 +4,7 @@ from churnops.config.loader import load_settings
 from churnops.config.models import (
     ArtifactConfig,
     DatasetConfig,
+    InferenceConfig,
     ModelConfig,
     ModelRegistryConfig,
     ProjectConfig,
@@ -16,6 +17,7 @@ from churnops.config.runtime import apply_runtime_overrides
 __all__ = [
     "ArtifactConfig",
     "DatasetConfig",
+    "InferenceConfig",
     "ModelConfig",
     "ModelRegistryConfig",
     "ProjectConfig",

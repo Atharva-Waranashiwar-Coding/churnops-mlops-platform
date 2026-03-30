@@ -134,3 +134,10 @@ tracking:
     comparison_metric: f1
     comparison_split: validation
     greater_is_better: true
+
+inference:
+  model_source: local_artifact
+  prediction_threshold: 0.5
+  preload_model: true
+  host: 0.0.0.0
+  port: 8000

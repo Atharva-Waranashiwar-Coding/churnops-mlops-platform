@@ -1,14 +1,14 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 03 extends the modular baseline with MLflow-backed experiment tracking, structured run logging, and a gated model registry workflow that stays compatible with future deployment automation.
+ChurnOps is a production-style MLOps project for customer churn prediction. Phase 04 adds a production-minded FastAPI inference service on top of the Phase 03 artifact and MLflow foundations so the trained churn model can be loaded, inspected, and queried through a stable HTTP contract.
 
-## Phase 03 Scope
+## Phase 04 Scope
 
-- keep the modular training pipeline from Phase 02 intact
-- track training runs in MLflow without leaking tracking code into preprocessing or model modules
-- log searchable parameters, per-split metrics, model artifacts, and evaluation outputs
-- register only the best model version according to a configurable comparison rule
-- keep tracking and registry settings externalized so local and remote backends can be swapped later
+- keep training, artifact persistence, and MLflow tracking intact from Phase 03
+- add a FastAPI service with clean separation between route handlers and model logic
+- serve health, metadata, and prediction endpoints with explicit schemas
+- support configurable model loading from local artifacts or MLflow-backed sources
+- keep the service ready for Docker, monitoring, and future Kubernetes deployment
 
 ## Repository Layout
 
@@ -28,6 +28,8 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 │       ├── features/         # preprocessing and dataset splitting
 │       ├── models/           # estimator training and metrics
 │       ├── pipeline/         # runner orchestration and CLI entrypoint
+│       ├── inference/        # model loading and prediction service layer
+│       ├── api/              # FastAPI app bootstrap, routes, and schemas
 │       └── tracking/         # tracker interface and MLflow implementation
 └── tests/                    # unit and integration tests
 ```
@@ -119,6 +121,66 @@ The local training runner executes these stages:
 5. evaluate each split and persist a structured local training run
 6. track the run in MLflow and register the model if it is the current best candidate
 
+## Inference API
+
+The inference service loads the trained sklearn pipeline behind a dedicated service layer. By default it serves the most recent local artifact from `artifacts/training/`, but the same API can be pointed at an MLflow model URI or an MLflow registered model alias/version through the `inference:` config section.
+
+Endpoints:
+
+- `GET /health`: liveness and readiness-style status for the API and model loader
+- `GET /v1/model/metadata`: loaded model source, feature contract, and class-label metadata
+- `POST /v1/predictions`: batch churn prediction endpoint
+
+Run the API locally:
+
+```bash
+make serve
+```
+
+Equivalent module entrypoint:
+
+```bash
+PYTHONPATH=src python -m churnops.api.app --config configs/base.yaml
+```
+
+The default service binding comes from the config:
+
+- `inference.host`: API bind host
+- `inference.port`: API bind port
+- `inference.model_source`: `local_artifact`, `mlflow_model_uri`, or `mlflow_registry`
+- `inference.prediction_threshold`: threshold used to mark `predicted_churn`
+- `inference.preload_model`: whether to load the model at startup
+
+Example prediction request based on the shipped churn fixture:
+
+```json
+{
+  "instances": [
+    {
+      "gender": "Female",
+      "SeniorCitizen": 0,
+      "Partner": "Yes",
+      "Dependents": "No",
+      "tenure": 1,
+      "PhoneService": "No",
+      "MultipleLines": "No phone service",
+      "InternetService": "DSL",
+      "OnlineSecurity": "Yes",
+      "OnlineBackup": "No",
+      "DeviceProtection": "No",
+      "TechSupport": "Yes",
+      "StreamingTV": "No",
+      "StreamingMovies": "No",
+      "Contract": "Month-to-month",
+      "PaperlessBilling": "Yes",
+      "PaymentMethod": "Electronic check",
+      "MonthlyCharges": 29.85,
+      "TotalCharges": ""
+    }
+  ]
+}
+```
+
 ## Running Tests
 
 ```bash
@@ -131,6 +193,7 @@ make test
 - configuration loading, settings models, and runtime overrides are centralized under `churnops.config`.
 - the pipeline runner is orchestration-only; domain logic stays in dedicated validation, preprocessing, training, and evaluation modules.
 - experiment tracking is isolated under `churnops.tracking`, so the rest of the codebase stays MLflow-agnostic.
+- the inference API is thin by design; model loading and prediction execution live under `churnops.inference`.
 - the feature contract is explicit by default, which prevents accidental training on unexpected or leakage-prone columns.
 - the persisted model artifact is a full sklearn pipeline, which keeps future FastAPI inference integration straightforward.
 - the MLflow registry flow is metric-driven and can be repointed to a remote backend without changing pipeline orchestration.
