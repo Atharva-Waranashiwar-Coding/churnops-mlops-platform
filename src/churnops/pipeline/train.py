@@ -71,6 +71,12 @@ def main() -> int:
     test_metrics = pipeline_result.evaluation_result.metrics["test"]
     LOGGER.info("Training completed successfully.")
     LOGGER.info("Artifact directory: %s", pipeline_result.persisted_run.run_directory)
+    if pipeline_result.tracking_result.enabled and pipeline_result.tracking_result.run_id:
+        LOGGER.info(
+            "MLflow run | experiment=%s run_id=%s",
+            pipeline_result.tracking_result.experiment_name,
+            pipeline_result.tracking_result.run_id,
+        )
     LOGGER.info(
         "Test metrics | accuracy=%.4f precision=%.4f recall=%.4f f1=%.4f roc_auc=%s",
         test_metrics["accuracy"],

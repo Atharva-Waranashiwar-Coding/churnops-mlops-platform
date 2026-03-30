@@ -69,7 +69,10 @@ class MLflowTrainingTracker:
 
         if self._active_run_id is None:
             raise RuntimeError("Cannot finalize tracking without an active MLflow run.")
-        del completed_run
+        self._log_params(completed_run)
+        self._log_metrics(completed_run)
+        self._log_local_artifacts(completed_run)
+        self._log_model_artifact(completed_run)
 
         return TrackingResult(
             enabled=True,
