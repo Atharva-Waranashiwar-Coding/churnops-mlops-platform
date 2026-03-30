@@ -1,0 +1,100 @@
+"""Tests for centralized training configuration handling."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import yaml
+
+from churnops.config import apply_runtime_overrides, load_settings
+
+
+def test_load_settings_applies_artifact_directory_defaults(
+    dataset_config,
+    churn_fixture_path,
+    tmp_path,
+) -> None:
+    """Config loading should fill in the standard artifact directory layout by default."""
+
+    config_path = _write_training_config(
+        tmp_path=tmp_path,
+        churn_fixture_path=churn_fixture_path,
+        dataset_config=dataset_config,
+    )
+
+    settings = load_settings(config_path)
+
+    assert settings.artifacts.model_directory == "model"
+    assert settings.artifacts.metrics_directory == "metrics"
+    assert settings.artifacts.metadata_directory == "metadata"
+    assert settings.artifacts.config_directory == "config"
+
+
+def test_apply_runtime_overrides_resolves_relative_dataset_paths(
+    dataset_config,
+    churn_fixture_path,
+    tmp_path,
+) -> None:
+    """Runtime data-path overrides should resolve relative to the configured project root."""
+
+    config_path = _write_training_config(
+        tmp_path=tmp_path,
+        churn_fixture_path=churn_fixture_path,
+        dataset_config=dataset_config,
+    )
+    settings = load_settings(config_path)
+
+    overridden = apply_runtime_overrides(settings, data_path=Path("alternate.csv"))
+
+    assert overridden.data.raw_data_path == (tmp_path / "alternate.csv").resolve()
+    assert overridden.project.root_dir == settings.project.root_dir
+
+
+def _write_training_config(tmp_path, churn_fixture_path, dataset_config) -> Path:
+    """Create a minimal training config for configuration-focused tests."""
+
+    config_path = tmp_path / "training.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "project": {
+                    "name": "churnops-test",
+                    "root_dir": str(tmp_path),
+                },
+                "data": {
+                    "raw_data_path": str(churn_fixture_path),
+                    "target_column": dataset_config.target_column,
+                    "positive_class": dataset_config.positive_class,
+                    "column_renames": dataset_config.column_renames,
+                    "id_columns": dataset_config.id_columns,
+                    "drop_columns": dataset_config.drop_columns,
+                    "required_columns": dataset_config.required_columns,
+                    "numeric_features": dataset_config.numeric_features,
+                    "categorical_features": dataset_config.categorical_features,
+                    "numeric_coercion_columns": dataset_config.numeric_coercion_columns,
+                    "na_values": dataset_config.na_values,
+                },
+                "split": {
+                    "test_size": 0.25,
+                    "validation_size": 0.25,
+                    "random_state": 42,
+                },
+                "model": {
+                    "name": "logistic_regression",
+                    "params": {
+                        "C": 1.0,
+                        "class_weight": "balanced",
+                        "max_iter": 1000,
+                        "solver": "lbfgs",
+                    },
+                },
+                "artifacts": {
+                    "root_dir": "artifacts",
+                    "training_runs_dir": "training",
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return config_path
