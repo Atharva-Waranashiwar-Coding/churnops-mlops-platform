@@ -2,11 +2,13 @@
 
 from churnops.config.loader import load_settings
 from churnops.config.models import (
+    AirflowConfig,
     ArtifactConfig,
     DatasetConfig,
     InferenceConfig,
     ModelConfig,
     ModelRegistryConfig,
+    OrchestrationConfig,
     ProjectConfig,
     Settings,
     SplitConfig,
@@ -20,11 +22,13 @@ from churnops.config.runtime import (
 )
 
 __all__ = [
+    "AirflowConfig",
     "ArtifactConfig",
     "DatasetConfig",
     "InferenceConfig",
     "ModelConfig",
     "ModelRegistryConfig",
+    "OrchestrationConfig",
     "ProjectConfig",
     "Settings",
     "SplitConfig",
