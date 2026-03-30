@@ -6,20 +6,19 @@ import argparse
 import logging
 from pathlib import Path
 
-from churnops.config import apply_runtime_overrides, load_settings
+from churnops.config import get_default_config_path, load_runtime_settings
 from churnops.pipeline.runner import TrainingPipelineResult, run_local_training
 
 LOGGER = logging.getLogger(__name__)
 
 
 def run_training(
-    config_path: str | Path,
+    config_path: str | Path | None,
     data_path: str | Path | None = None,
 ) -> TrainingPipelineResult:
     """Execute the end-to-end local baseline training workflow."""
 
-    settings = load_settings(config_path)
-    settings = apply_runtime_overrides(settings, data_path=data_path)
+    settings = load_runtime_settings(config_path, data_path=data_path)
     return run_local_training(settings)
 
 
@@ -29,7 +28,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train the ChurnOps baseline churn model.")
     parser.add_argument(
         "--config",
-        default="configs/base.yaml",
+        default=get_default_config_path(),
         help="Path to the YAML configuration file.",
     )
     parser.add_argument(

@@ -1,6 +1,7 @@
 /README_ChurnOps.md
 /.pytest_cache/
 /.venv/
+/.env
 /artifacts/*
 !/artifacts/.gitignore
 /data/raw/*

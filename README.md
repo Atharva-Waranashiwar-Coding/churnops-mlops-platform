@@ -1,14 +1,14 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 04 adds a production-minded FastAPI inference service on top of the Phase 03 artifact and MLflow foundations so the trained churn model can be loaded, inspected, and queried through a stable HTTP contract.
+ChurnOps is a production-style MLOps project for customer churn prediction. Phase 05 adds containerization and a Docker Compose-based local platform so the inference service can run through a realistic product workflow with environment-driven runtime configuration.
 
-## Phase 04 Scope
+## Phase 05 Scope
 
-- keep training, artifact persistence, and MLflow tracking intact from Phase 03
-- add a FastAPI service with clean separation between route handlers and model logic
-- serve health, metadata, and prediction endpoints with explicit schemas
-- support configurable model loading from local artifacts or MLflow-backed sources
-- keep the service ready for Docker, monitoring, and future Kubernetes deployment
+- keep training, inference, artifact persistence, and MLflow integration intact from earlier phases
+- add a production-minded Docker image for the inference service
+- add a practical Docker Compose stack for local platform development
+- make runtime configuration environment-driven for containers and CI
+- stabilize startup so empty local volumes do not break the platform bootstrap
 
 ## Repository Layout
 
@@ -17,9 +17,13 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 ├── artifacts/                # local training outputs (gitignored)
 ├── configs/
 │   └── base.yaml             # default training configuration
+├── docker/
+│   └── entrypoint.sh         # runtime bootstrap for container services
 ├── data/
 │   ├── processed/            # reserved for later phases
 │   └── raw/                  # local input dataset location (gitignored)
+├── docker-compose.yml        # local platform stack for API, training, and MLflow UI
+├── Dockerfile                # production-minded inference service image
 ├── src/
 │   └── churnops/
 │       ├── artifacts/        # artifact persistence logic
@@ -181,6 +185,53 @@ Example prediction request based on the shipped churn fixture:
 }
 ```
 
+## Containerized Local Platform
+
+The repository now includes a Docker image for the inference service and a `docker-compose.yml` stack for local platform workflows. Runtime behavior is driven through `CHURNOPS_*` environment variables so the same image can support local development, CI smoke tests, and later deployment targets.
+
+Copy the sample environment file before using Docker:
+
+```bash
+cp .env.example .env
+```
+
+Build and run the local inference service:
+
+```bash
+make platform-up
+```
+
+Bootstrap or refresh the local model artifact from Docker:
+
+```bash
+make platform-train
+```
+
+Stop the local platform:
+
+```bash
+make platform-down
+```
+
+The compose stack includes:
+
+- `inference-api`: long-running FastAPI service for prediction traffic
+- `trainer`: one-shot training service under the `ops` profile
+- `mlflow`: MLflow UI under the `ops` profile for experiment inspection
+
+Useful environment variables:
+
+- `CHURNOPS_CONFIG`: config file path inside the container
+- `CHURNOPS_DATA_PATH`: dataset path override
+- `CHURNOPS_INFERENCE_MODEL_SOURCE`: `local_artifact`, `mlflow_model_uri`, or `mlflow_registry`
+- `CHURNOPS_INFERENCE_LOCAL_RUN_ID` / `CHURNOPS_INFERENCE_LOCAL_MODEL_PATH`: select the local model artifact
+- `CHURNOPS_INFERENCE_MODEL_URI`: explicit MLflow model URI
+- `CHURNOPS_INFERENCE_REGISTERED_MODEL_NAME`, `CHURNOPS_INFERENCE_REGISTERED_MODEL_ALIAS`, `CHURNOPS_INFERENCE_REGISTERED_MODEL_VERSION`: MLflow registry model selection
+- `CHURNOPS_TRACKING_URI`, `CHURNOPS_REGISTRY_URI`, `CHURNOPS_TRACKING_ARTIFACT_LOCATION`: shared tracking backend configuration
+- `MLFLOW_UI_PORT`: host port for the MLflow UI service
+
+The image uses a non-root runtime user, an explicit healthcheck, and a small entrypoint bootstrap so empty bind mounts still produce the required local runtime directories.
+
 ## Running Tests
 
 ```bash
@@ -194,6 +245,7 @@ make test
 - the pipeline runner is orchestration-only; domain logic stays in dedicated validation, preprocessing, training, and evaluation modules.
 - experiment tracking is isolated under `churnops.tracking`, so the rest of the codebase stays MLflow-agnostic.
 - the inference API is thin by design; model loading and prediction execution live under `churnops.inference`.
+- environment-based runtime overrides keep the same image usable across local Docker workflows, CI, and future deployment targets.
 - the feature contract is explicit by default, which prevents accidental training on unexpected or leakage-prone columns.
 - the persisted model artifact is a full sklearn pipeline, which keeps future FastAPI inference integration straightforward.
 - the MLflow registry flow is metric-driven and can be repointed to a remote backend without changing pipeline orchestration.

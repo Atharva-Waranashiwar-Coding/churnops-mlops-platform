@@ -1,4 +1,4 @@
-.PHONY: install-dev serve train test
+.PHONY: install-dev platform-down platform-train platform-up serve train test
 
 CONFIG ?= configs/base.yaml
 DATA_PATH ?=
@@ -11,6 +11,15 @@ train:
 
 serve:
 	PYTHONPATH=src python -m churnops.api.app --config $(CONFIG)
+
+platform-up:
+	docker compose up --build inference-api
+
+platform-train:
+	docker compose run --rm --profile ops trainer
+
+platform-down:
+	docker compose down --remove-orphans
 
 test:
 	PYTHONPATH=src pytest
