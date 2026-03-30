@@ -36,6 +36,7 @@ def test_run_local_training_returns_modular_pipeline_result(
     assert result.evaluation_result.split_sizes == {"train": 12, "test": 6, "validation": 6}
     assert result.persisted_run.model_path.exists()
     assert result.persisted_run.validation_report_path.exists()
+    assert result.tracking_result.enabled is False
 
 
 def _write_training_config(tmp_path, churn_fixture_path, dataset_config) -> Path:

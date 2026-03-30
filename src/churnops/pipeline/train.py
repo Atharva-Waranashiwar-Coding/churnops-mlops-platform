@@ -71,6 +71,29 @@ def main() -> int:
     test_metrics = pipeline_result.evaluation_result.metrics["test"]
     LOGGER.info("Training completed successfully.")
     LOGGER.info("Artifact directory: %s", pipeline_result.persisted_run.run_directory)
+    if pipeline_result.tracking_result.enabled and pipeline_result.tracking_result.run_id:
+        LOGGER.info(
+            "MLflow run | experiment=%s run_id=%s",
+            pipeline_result.tracking_result.experiment_name,
+            pipeline_result.tracking_result.run_id,
+        )
+        registry_result = pipeline_result.tracking_result.model_registry
+        if registry_result is not None and registry_result.registered:
+            LOGGER.info(
+                "Registered model | name=%s version=%s metric=%s.%s=%.4f",
+                registry_result.model_name,
+                registry_result.model_version,
+                registry_result.metric_split,
+                registry_result.metric_name,
+                registry_result.candidate_metric,
+            )
+        elif registry_result is not None and registry_result.attempted:
+            LOGGER.info(
+                "Model registry skipped | status=%s metric=%s.%s",
+                registry_result.status,
+                registry_result.metric_split,
+                registry_result.metric_name,
+            )
     LOGGER.info(
         "Test metrics | accuracy=%.4f precision=%.4f recall=%.4f f1=%.4f roc_auc=%s",
         test_metrics["accuracy"],

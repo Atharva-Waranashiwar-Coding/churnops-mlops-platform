@@ -78,6 +78,54 @@ class ArtifactConfig:
 
 
 @dataclass(slots=True)
+class ModelRegistryConfig:
+    """Model registry settings for tracked training runs."""
+
+    enabled: bool = False
+    model_name: str | None = None
+    comparison_metric: str = "f1"
+    comparison_split: str = "validation"
+    greater_is_better: bool = True
+    alias: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate registry settings after deserialization."""
+
+        if self.enabled and not self.model_name:
+            raise ValueError(
+                "tracking.model_registry.model_name must be set when model registry is enabled."
+            )
+
+
+@dataclass(slots=True)
+class TrackingConfig:
+    """Experiment tracking settings for training runs."""
+
+    enabled: bool = False
+    experiment_name: str = "churnops-training"
+    tracking_uri: str | None = None
+    registry_uri: str | None = None
+    artifact_location: str | None = None
+    run_name_prefix: str | None = None
+    model_artifact_path: str = "model"
+    local_artifacts_path: str = "local_run"
+    tags: dict[str, str] = field(default_factory=dict)
+    model_registry: ModelRegistryConfig = field(default_factory=ModelRegistryConfig)
+
+    def __post_init__(self) -> None:
+        """Validate tracking settings after deserialization."""
+
+        if self.enabled and not self.tracking_uri:
+            raise ValueError("tracking.tracking_uri must be set when tracking is enabled.")
+        if self.enabled and not self.artifact_location:
+            raise ValueError("tracking.artifact_location must be set when tracking is enabled.")
+        if not self.model_artifact_path:
+            raise ValueError("tracking.model_artifact_path must not be empty.")
+        if not self.local_artifacts_path:
+            raise ValueError("tracking.local_artifacts_path must not be empty.")
+
+
+@dataclass(slots=True)
 class Settings:
     """Top-level application settings for a training run."""
 
@@ -86,4 +134,5 @@ class Settings:
     split: SplitConfig
     model: ModelConfig
     artifacts: ArtifactConfig
+    tracking: TrackingConfig
     config_path: Path

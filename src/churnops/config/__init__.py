@@ -5,9 +5,11 @@ from churnops.config.models import (
     ArtifactConfig,
     DatasetConfig,
     ModelConfig,
+    ModelRegistryConfig,
     ProjectConfig,
     Settings,
     SplitConfig,
+    TrackingConfig,
 )
 from churnops.config.runtime import apply_runtime_overrides
 
@@ -15,9 +17,11 @@ __all__ = [
     "ArtifactConfig",
     "DatasetConfig",
     "ModelConfig",
+    "ModelRegistryConfig",
     "ProjectConfig",
     "Settings",
     "SplitConfig",
+    "TrackingConfig",
     "apply_runtime_overrides",
     "load_settings",
 ]

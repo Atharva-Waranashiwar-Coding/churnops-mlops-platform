@@ -11,9 +11,11 @@ from churnops.config.models import (
     ArtifactConfig,
     DatasetConfig,
     ModelConfig,
+    ModelRegistryConfig,
     ProjectConfig,
     Settings,
     SplitConfig,
+    TrackingConfig,
 )
 
 
@@ -35,6 +37,7 @@ def load_settings(config_path: str | Path) -> Settings:
     split_section = _as_mapping(raw_settings.get("split", {}), "split")
     model_section = _as_mapping(raw_settings.get("model", {}), "model")
     artifacts_section = _as_mapping(raw_settings.get("artifacts", {}), "artifacts")
+    tracking_section = _as_mapping(raw_settings.get("tracking", {}), "tracking")
 
     project_root = Path(project_section.get("root_dir", "."))
     if not project_root.is_absolute():
@@ -99,6 +102,53 @@ def load_settings(config_path: str | Path) -> Settings:
             artifacts_section.get("config_snapshot_filename", "config.yaml")
         ),
     )
+    model_registry_section = _as_mapping(
+        tracking_section.get("model_registry", {}),
+        "tracking.model_registry",
+    )
+    tracking_uri = _resolve_uri(
+        project.root_dir,
+        tracking_section.get("tracking_uri", "sqlite:///artifacts/mlflow/mlflow.db"),
+    )
+    registry_uri = _resolve_uri(
+        project.root_dir,
+        tracking_section.get("registry_uri", tracking_uri),
+    )
+    artifact_location = _resolve_uri(
+        project.root_dir,
+        tracking_section.get("artifact_location", "artifacts/mlflow/artifacts"),
+    )
+    tracking = TrackingConfig(
+        enabled=bool(tracking_section.get("enabled", False)),
+        experiment_name=str(tracking_section.get("experiment_name", "churnops-training")),
+        tracking_uri=tracking_uri,
+        registry_uri=registry_uri,
+        artifact_location=artifact_location,
+        run_name_prefix=(
+            str(tracking_section["run_name_prefix"])
+            if tracking_section.get("run_name_prefix") is not None
+            else None
+        ),
+        model_artifact_path=str(tracking_section.get("model_artifact_path", "model")),
+        local_artifacts_path=str(tracking_section.get("local_artifacts_path", "local_run")),
+        tags=_as_string_mapping(tracking_section.get("tags", {}), "tracking.tags"),
+        model_registry=ModelRegistryConfig(
+            enabled=bool(model_registry_section.get("enabled", False)),
+            model_name=(
+                str(model_registry_section["model_name"])
+                if model_registry_section.get("model_name") is not None
+                else None
+            ),
+            comparison_metric=str(model_registry_section.get("comparison_metric", "f1")),
+            comparison_split=str(model_registry_section.get("comparison_split", "validation")),
+            greater_is_better=bool(model_registry_section.get("greater_is_better", True)),
+            alias=(
+                str(model_registry_section["alias"])
+                if model_registry_section.get("alias") is not None
+                else None
+            ),
+        ),
+    )
 
     return Settings(
         project=project,
@@ -106,6 +156,7 @@ def load_settings(config_path: str | Path) -> Settings:
         split=split,
         model=model,
         artifacts=artifacts,
+        tracking=tracking,
         config_path=resolved_config_path,
     )
 
@@ -117,6 +168,19 @@ def _resolve_path(base_dir: Path, candidate: str | Path) -> Path:
     if path.is_absolute():
         return path
     return (base_dir / path).resolve()
+
+
+def _resolve_uri(base_dir: Path, candidate: str | Path) -> str:
+    """Resolve a local path candidate into a file URI when no URI scheme is present."""
+
+    candidate_text = str(candidate)
+    if candidate_text.startswith("sqlite:///") and not candidate_text.startswith("sqlite:////"):
+        resolved_path = _resolve_path(base_dir, candidate_text.removeprefix("sqlite:///"))
+        return f"sqlite:///{resolved_path}"
+    if "://" in candidate_text:
+        return candidate_text
+
+    return _resolve_path(base_dir, candidate_text).as_uri()
 
 
 def _as_mapping(value: Any, section_name: str) -> dict[str, Any]:

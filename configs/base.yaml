@@ -115,3 +115,22 @@ artifacts:
   validation_report_filename: validation.json
   config_directory: config
   config_snapshot_filename: training.yaml
+
+tracking:
+  enabled: true
+  experiment_name: churnops-local-training
+  tracking_uri: sqlite:///artifacts/mlflow/mlflow.db
+  registry_uri: sqlite:///artifacts/mlflow/mlflow.db
+  artifact_location: artifacts/mlflow/artifacts
+  run_name_prefix: churnops-local
+  model_artifact_path: model
+  local_artifacts_path: local_run
+  tags:
+    environment: local
+    workflow: training
+  model_registry:
+    enabled: true
+    model_name: churnops-churn-classifier
+    comparison_metric: f1
+    comparison_split: validation
+    greater_is_better: true
