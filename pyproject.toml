@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "churnops"
+version = "0.1.0"
+description = "Production-style churn prediction baseline for the ChurnOps MLOps platform."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "joblib>=1.3,<2.0",
+    "pandas>=2.2,<3.0",
+    "PyYAML>=6.0,<7.0",
+    "scikit-learn>=1.4,<2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9.0",
+]
+
+[project.scripts]
+churnops-train = "churnops.pipeline.train:main"
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]

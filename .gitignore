@@ -1,0 +1,13 @@
+/README_ChurnOps.md
+/.pytest_cache/
+/.venv/
+/artifacts/*
+!/artifacts/.gitignore
+/data/raw/*
+!/data/raw/.gitignore
+/data/processed/*
+!/data/processed/.gitignore
+/src/*.egg-info/
+__pycache__/
+*.pyc
+.DS_Store
