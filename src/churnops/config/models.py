@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -178,6 +179,44 @@ class InferenceConfig:
 
 
 @dataclass(slots=True)
+class AirflowConfig:
+    """Airflow DAG scheduling and retry settings."""
+
+    dag_id: str = "churnops_training_pipeline"
+    schedule: str | None = None
+    start_date: datetime = field(
+        default_factory=lambda: datetime.fromisoformat("2024-01-01T00:00:00+00:00")
+    )
+    catchup: bool = False
+    max_active_runs: int = 1
+    retries: int = 1
+    retry_delay_minutes: int = 5
+    tags: list[str] = field(default_factory=lambda: ["churnops", "training"])
+
+    def __post_init__(self) -> None:
+        """Validate Airflow DAG settings after deserialization."""
+
+        if not self.dag_id:
+            raise ValueError("orchestration.airflow.dag_id must not be empty.")
+        if self.max_active_runs < 1:
+            raise ValueError("orchestration.airflow.max_active_runs must be at least 1.")
+        if self.retries < 0:
+            raise ValueError("orchestration.airflow.retries must be zero or greater.")
+        if self.retry_delay_minutes < 0:
+            raise ValueError(
+                "orchestration.airflow.retry_delay_minutes must be zero or greater."
+            )
+
+
+@dataclass(slots=True)
+class OrchestrationConfig:
+    """Runtime settings for orchestrated pipeline execution."""
+
+    workspace_dir: Path
+    airflow: AirflowConfig = field(default_factory=AirflowConfig)
+
+
+@dataclass(slots=True)
 class Settings:
     """Top-level application settings for a training run."""
 
@@ -188,4 +227,5 @@ class Settings:
     artifacts: ArtifactConfig
     tracking: TrackingConfig
     inference: InferenceConfig
+    orchestration: OrchestrationConfig
     config_path: Path

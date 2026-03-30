@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from churnops.config.models import (
+    AirflowConfig,
     ArtifactConfig,
     DatasetConfig,
     InferenceConfig,
     ModelConfig,
     ModelRegistryConfig,
+    OrchestrationConfig,
     ProjectConfig,
     Settings,
     SplitConfig,
@@ -40,6 +43,7 @@ def load_settings(config_path: str | Path) -> Settings:
     artifacts_section = _as_mapping(raw_settings.get("artifacts", {}), "artifacts")
     tracking_section = _as_mapping(raw_settings.get("tracking", {}), "tracking")
     inference_section = _as_mapping(raw_settings.get("inference", {}), "inference")
+    orchestration_section = _as_mapping(raw_settings.get("orchestration", {}), "orchestration")
 
     project_root = Path(project_section.get("root_dir", "."))
     if not project_root.is_absolute():
@@ -192,6 +196,33 @@ def load_settings(config_path: str | Path) -> Settings:
         host=str(inference_section.get("host", "0.0.0.0")),
         port=int(inference_section.get("port", 8000)),
     )
+    airflow_section = _as_mapping(orchestration_section.get("airflow", {}), "orchestration.airflow")
+    orchestration = OrchestrationConfig(
+        workspace_dir=_resolve_path(
+            project.root_dir,
+            orchestration_section.get("workspace_dir", "artifacts/orchestration"),
+        ),
+        airflow=AirflowConfig(
+            dag_id=str(airflow_section.get("dag_id", "churnops_training_pipeline")),
+            schedule=(
+                str(airflow_section["schedule"])
+                if airflow_section.get("schedule") is not None
+                else None
+            ),
+            start_date=_parse_datetime(
+                airflow_section.get("start_date", "2024-01-01T00:00:00+00:00"),
+                "orchestration.airflow.start_date",
+            ),
+            catchup=bool(airflow_section.get("catchup", False)),
+            max_active_runs=int(airflow_section.get("max_active_runs", 1)),
+            retries=int(airflow_section.get("retries", 1)),
+            retry_delay_minutes=int(airflow_section.get("retry_delay_minutes", 5)),
+            tags=_as_string_list(
+                airflow_section.get("tags", ["churnops", "training"]),
+                "orchestration.airflow.tags",
+            ),
+        ),
+    )
 
     return Settings(
         project=project,
@@ -201,6 +232,7 @@ def load_settings(config_path: str | Path) -> Settings:
         artifacts=artifacts,
         tracking=tracking,
         inference=inference,
+        orchestration=orchestration,
         config_path=resolved_config_path,
     )
 
@@ -254,3 +286,14 @@ def _as_string_mapping(value: Any, section_name: str) -> dict[str, str]:
         raise ValueError(f"Configuration section '{section_name}' must be a mapping.")
 
     return {str(key): str(item) for key, item in value.items()}
+
+
+def _parse_datetime(value: Any, section_name: str) -> datetime:
+    """Parse an ISO 8601 datetime configuration value."""
+
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError as error:
+        raise ValueError(
+            f"Configuration section '{section_name}' must be a valid ISO 8601 datetime."
+        ) from error

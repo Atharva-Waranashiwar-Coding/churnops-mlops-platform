@@ -126,6 +126,53 @@ def apply_runtime_overrides(
             inference=replace(overridden_settings.inference, **inference_updates),
         )
 
+    orchestration_updates: dict[str, object] = {}
+
+    workspace_dir = _read_environment_value(environment, "CHURNOPS_ORCHESTRATION_WORKSPACE_DIR")
+    if workspace_dir is not _UNSET and workspace_dir:
+        orchestration_updates["workspace_dir"] = _resolve_path(overridden_settings, workspace_dir)
+
+    airflow_updates: dict[str, object] = {}
+
+    dag_id = _read_environment_value(environment, "CHURNOPS_AIRFLOW_DAG_ID")
+    if dag_id is not _UNSET and dag_id:
+        airflow_updates["dag_id"] = dag_id
+
+    schedule = _read_environment_value(environment, "CHURNOPS_AIRFLOW_SCHEDULE")
+    if schedule is not _UNSET:
+        airflow_updates["schedule"] = schedule or None
+
+    catchup = _read_environment_value(environment, "CHURNOPS_AIRFLOW_CATCHUP")
+    if catchup is not _UNSET and catchup:
+        airflow_updates["catchup"] = _parse_bool(catchup)
+
+    max_active_runs = _read_environment_value(environment, "CHURNOPS_AIRFLOW_MAX_ACTIVE_RUNS")
+    if max_active_runs is not _UNSET and max_active_runs:
+        airflow_updates["max_active_runs"] = int(max_active_runs)
+
+    retries = _read_environment_value(environment, "CHURNOPS_AIRFLOW_RETRIES")
+    if retries is not _UNSET and retries:
+        airflow_updates["retries"] = int(retries)
+
+    retry_delay_minutes = _read_environment_value(
+        environment,
+        "CHURNOPS_AIRFLOW_RETRY_DELAY_MINUTES",
+    )
+    if retry_delay_minutes is not _UNSET and retry_delay_minutes:
+        airflow_updates["retry_delay_minutes"] = int(retry_delay_minutes)
+
+    if airflow_updates:
+        orchestration_updates["airflow"] = replace(
+            overridden_settings.orchestration.airflow,
+            **airflow_updates,
+        )
+
+    if orchestration_updates:
+        overridden_settings = replace(
+            overridden_settings,
+            orchestration=replace(overridden_settings.orchestration, **orchestration_updates),
+        )
+
     return overridden_settings
 
 
@@ -152,6 +199,7 @@ def ensure_runtime_directories(settings: Settings) -> None:
         exist_ok=True,
     )
     settings.data.raw_data_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.orchestration.workspace_dir.mkdir(parents=True, exist_ok=True)
 
     tracking_store_path = _local_path_from_uri(settings.tracking.tracking_uri)
     if tracking_store_path is not None:

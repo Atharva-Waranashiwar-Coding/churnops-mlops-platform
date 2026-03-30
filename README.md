@@ -1,14 +1,14 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 06 adds GitHub Actions-based quality gates so linting, tests, package build checks, and Docker build validation run automatically against the current local-platform architecture.
+ChurnOps is a production-style MLOps project for customer churn prediction. Phase 07 adds Airflow-based orchestration so the existing training system can run as a scheduled, task-oriented retraining workflow without duplicating model logic.
 
-## Phase 06 Scope
+## Phase 07 Scope
 
-- keep training, inference, tracking, and containerization intact from earlier phases
-- add automated GitHub Actions checks for linting, tests, and package build validation
-- validate the inference Docker image in CI without pushing artifacts
-- keep CI feedback fast enough for normal pull request work
-- document the relationship between local commands and CI expectations
+- keep the current training, tracking, inference, and containerization layers intact
+- add Airflow orchestration around the existing training stages instead of rewriting them in DAG code
+- support scheduled retraining with configurable DAG schedule and retry behavior
+- make the local platform capable of running Airflow scheduler and webserver services
+- document how local execution and orchestrated execution fit together
 
 ## Repository Layout
 
@@ -16,10 +16,13 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 .
 ├── .github/
 │   └── workflows/            # GitHub Actions quality gates
+├── airflow/
+│   └── dags/                 # Airflow DAG entrypoints
 ├── artifacts/                # local training outputs (gitignored)
 ├── configs/
 │   └── base.yaml             # default training configuration
 ├── docker/
+│   ├── airflow/              # Airflow image bootstrap assets
 │   └── entrypoint.sh         # runtime bootstrap for container services
 ├── data/
 │   ├── processed/            # reserved for later phases
@@ -36,6 +39,7 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 │       ├── pipeline/         # runner orchestration and CLI entrypoint
 │       ├── inference/        # model loading and prediction service layer
 │       ├── api/              # FastAPI app bootstrap, routes, and schemas
+│       ├── orchestration/    # stage-oriented training tasks and Airflow DAG builder
 │       └── tracking/         # tracker interface and MLflow implementation
 └── tests/                    # unit and integration tests
 ```
@@ -126,6 +130,37 @@ The local training runner executes these stages:
 4. train the configured baseline estimator
 5. evaluate each split and persist a structured local training run
 6. track the run in MLflow and register the model if it is the current best candidate
+
+Phase 07 keeps those same stages, but exposes them through a stage-oriented orchestration layer so Airflow can execute them as separate tasks with filesystem-backed handoff artifacts between task boundaries.
+
+## Airflow Orchestration
+
+Airflow does not own the business logic. The DAG is intentionally thin:
+
+- `airflow/dags/churnops_training.py` is only the DAG entrypoint that Airflow discovers
+- `churnops.orchestration.airflow` defines the TaskFlow DAG and schedule metadata
+- `churnops.orchestration.training_tasks` wraps the existing ingestion, validation, preprocessing, training, evaluation, persistence, and tracking modules
+- `churnops.orchestration.stage_store` persists intermediate artifacts so task retries and local debugging have stable handoff points
+
+The DAG task sequence is:
+
+1. bootstrap run context and workspace
+2. ingest and normalize the raw dataset
+3. validate the dataset contract
+4. preprocess features and create train, validation, and test splits
+5. train the configured baseline model
+6. evaluate model metrics across splits
+7. persist artifacts, log to MLflow, and run the model-registration policy
+
+The DAG schedule and retry settings live under the `orchestration.airflow` section in `configs/base.yaml` and can be overridden with `CHURNOPS_AIRFLOW_*` environment variables at runtime.
+
+For local DAG development outside Docker, install the Airflow extra with the matching upstream constraint set for your Python version. For example on Python 3.11:
+
+```bash
+python -m pip install \
+  --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.4/constraints-3.11.txt" \
+  -e ".[dev,airflow]"
+```
 
 ## Inference API
 
@@ -220,6 +255,10 @@ The compose stack includes:
 - `inference-api`: long-running FastAPI service for prediction traffic
 - `trainer`: one-shot training service under the `ops` profile
 - `mlflow`: MLflow UI under the `ops` profile for experiment inspection
+- `airflow-db`: PostgreSQL metadata database for Airflow
+- `airflow-init`: one-shot Airflow metadata bootstrap and admin-user creation
+- `airflow-scheduler`: scheduled retraining and task execution service
+- `airflow-webserver`: local Airflow UI for DAG inspection and manual triggers
 
 Useful environment variables:
 
@@ -231,8 +270,25 @@ Useful environment variables:
 - `CHURNOPS_INFERENCE_REGISTERED_MODEL_NAME`, `CHURNOPS_INFERENCE_REGISTERED_MODEL_ALIAS`, `CHURNOPS_INFERENCE_REGISTERED_MODEL_VERSION`: MLflow registry model selection
 - `CHURNOPS_TRACKING_URI`, `CHURNOPS_REGISTRY_URI`, `CHURNOPS_TRACKING_ARTIFACT_LOCATION`: shared tracking backend configuration
 - `MLFLOW_UI_PORT`: host port for the MLflow UI service
+- `CHURNOPS_ORCHESTRATION_WORKSPACE_DIR`: intermediate task handoff directory for orchestrated runs
+- `CHURNOPS_AIRFLOW_DAG_ID`, `CHURNOPS_AIRFLOW_SCHEDULE`, `CHURNOPS_AIRFLOW_CATCHUP`, `CHURNOPS_AIRFLOW_MAX_ACTIVE_RUNS`, `CHURNOPS_AIRFLOW_RETRIES`, `CHURNOPS_AIRFLOW_RETRY_DELAY_MINUTES`: orchestration schedule and retry controls
+- `AIRFLOW_WEBSERVER_PORT`, `AIRFLOW_ADMIN_*`, `AIRFLOW_UID`: local Airflow service configuration
 
 The image uses a non-root runtime user, an explicit healthcheck, and a small entrypoint bootstrap so empty bind mounts still produce the required local runtime directories.
+
+To bootstrap the local Airflow metadata database and admin user:
+
+```bash
+make airflow-init
+```
+
+To run the scheduler and webserver locally:
+
+```bash
+make airflow-up
+```
+
+With the default `.env.example`, the Airflow UI is available at `http://localhost:8080` and the DAG runs on the configured cron schedule of `0 3 * * 1`.
 
 ## Continuous Integration
 
@@ -265,6 +321,8 @@ make test
 - experiment tracking is isolated under `churnops.tracking`, so the rest of the codebase stays MLflow-agnostic.
 - the inference API is thin by design; model loading and prediction execution live under `churnops.inference`.
 - environment-based runtime overrides keep the same image usable across local Docker workflows, CI, and future deployment targets.
+- orchestration state is externalized into a dedicated workspace so Airflow retries can resume from persisted stage outputs instead of recomputing everything blindly.
+- the DAG layer stays thin; reusable task wrappers keep orchestration concerns separate from model-training code.
 - the feature contract is explicit by default, which prevents accidental training on unexpected or leakage-prone columns.
 - the persisted model artifact is a full sklearn pipeline, which keeps future FastAPI inference integration straightforward.
 - the MLflow registry flow is metric-driven and can be repointed to a remote backend without changing pipeline orchestration.
