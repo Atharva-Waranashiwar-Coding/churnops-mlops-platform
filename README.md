@@ -1,15 +1,14 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 01 establishes the local baseline: configuration-driven data ingestion, preprocessing, model training, evaluation, and artifact persistence without relying on notebooks as the main implementation path.
+ChurnOps is a production-style MLOps project for customer churn prediction. Phase 02 extends the local baseline into a more modular training architecture with centralized configuration, explicit validation, clearer orchestration boundaries, and a standardized artifact layout for future experiment tracking.
 
-## Phase 01 Scope
+## Phase 02 Scope
 
-- bootstrap a maintainable Python project structure
-- ingest a local churn dataset with schema checks
-- preprocess mixed numeric and categorical features with sklearn pipelines
-- train a baseline logistic regression classifier
-- evaluate train, validation, and test performance
-- persist the trained pipeline and run metadata to a structured artifacts directory
+- keep the working baseline training flow intact while refactoring it into modular pipeline stages
+- validate the raw dataset contract before preprocessing
+- centralize configuration loading and runtime overrides
+- separate preprocessing, training, evaluation, and orchestration responsibilities
+- standardize local run outputs for future MLflow-style integration
 
 ## Repository Layout
 
@@ -24,11 +23,11 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 ├── src/
 │   └── churnops/
 │       ├── artifacts/        # artifact persistence logic
-│       ├── data/             # dataset ingestion
+│       ├── config/           # settings models, loading, and runtime overrides
+│       ├── data/             # dataset ingestion and validation
 │       ├── features/         # preprocessing and dataset splitting
 │       ├── models/           # estimator training and metrics
-│       ├── pipeline/         # CLI entrypoints
-│       └── config.py         # typed settings loader
+│       └── pipeline/         # runner orchestration and CLI entrypoint
 └── tests/                    # unit and integration tests
 ```
 
@@ -61,7 +60,13 @@ Place the dataset at `data/raw/customer_churn.csv`, then run:
 make train
 ```
 
-Equivalent direct command:
+Installed CLI entrypoint:
+
+```bash
+churnops-train --config configs/base.yaml
+```
+
+Equivalent module entrypoint:
 
 ```bash
 PYTHONPATH=src python -m churnops.pipeline.train --config configs/base.yaml
@@ -75,10 +80,21 @@ make train DATA_PATH=/absolute/path/to/customer_churn.csv
 
 On success, the pipeline writes a timestamped run directory under `artifacts/training/` containing:
 
-- `model.joblib`: serialized sklearn pipeline with preprocessing and classifier
-- `metrics.json`: train, validation, and test metrics
-- `metadata.json`: dataset, feature, split, and model metadata
-- `config.yaml`: snapshot of the resolved training config
+- `model/model.joblib`: serialized sklearn pipeline with preprocessing and classifier
+- `metrics/metrics.json`: train, validation, and test metrics
+- `metadata/run.json`: run metadata, config provenance, and artifact paths
+- `metadata/validation.json`: raw dataset validation summary
+- `config/training.yaml`: snapshot of the resolved training config
+
+## Training Flow
+
+The local training runner executes these stages:
+
+1. read and normalize the raw dataset
+2. validate the dataset contract and target availability
+3. prepare features and targets, then split train/validation/test data
+4. train the configured baseline estimator
+5. evaluate each split and persist a structured training run
 
 ## Running Tests
 
@@ -89,6 +105,8 @@ make test
 ## Design Notes
 
 - `src/` package layout keeps the codebase ready for packaging, CI, Docker, and service integration.
-- configuration is separated from implementation so later phases can extend the training workflow without rewriting module boundaries.
+- configuration loading, settings models, and runtime overrides are centralized under `churnops.config`.
+- the pipeline runner is orchestration-only; domain logic stays in dedicated validation, preprocessing, training, and evaluation modules.
 - the feature contract is explicit by default, which prevents accidental training on unexpected or leakage-prone columns.
 - the persisted model artifact is a full sklearn pipeline, which keeps future FastAPI inference integration straightforward.
+- run outputs are grouped by type so later MLflow integration can wrap the existing layout instead of replacing it.

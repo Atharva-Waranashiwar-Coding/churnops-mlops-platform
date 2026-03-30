@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -14,6 +15,16 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+
+from churnops.features.preprocessing import DataSplits
+
+
+@dataclass(slots=True)
+class EvaluationResult:
+    """Metrics and split sizes computed for a training run."""
+
+    metrics: dict[str, dict[str, float | int | None]]
+    split_sizes: dict[str, int]
 
 
 def evaluate_classifier(
@@ -41,6 +52,29 @@ def evaluate_classifier(
         "true_positives": int(tp),
     }
     return metrics
+
+
+def evaluate_model_splits(model: Any, data_splits: DataSplits) -> EvaluationResult:
+    """Evaluate a trained model across each available dataset split."""
+
+    split_frames: dict[str, tuple[pd.DataFrame, pd.Series]] = {
+        "train": (data_splits.X_train, data_splits.y_train),
+        "test": (data_splits.X_test, data_splits.y_test),
+    }
+
+    if data_splits.X_validation is not None and data_splits.y_validation is not None:
+        split_frames["validation"] = (data_splits.X_validation, data_splits.y_validation)
+
+    metrics = {
+        split_name: evaluate_classifier(model, features, target)
+        for split_name, (features, target) in split_frames.items()
+    }
+    split_sizes = {
+        split_name: int(target.shape[0])
+        for split_name, (_, target) in split_frames.items()
+    }
+
+    return EvaluationResult(metrics=metrics, split_sizes=split_sizes)
 
 
 def _extract_positive_class_scores(model: Any, features: pd.DataFrame) -> pd.Series | None:
