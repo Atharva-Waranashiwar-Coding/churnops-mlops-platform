@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import logging
 from pathlib import Path
 
 from churnops.artifacts.persistence import PersistedRun, persist_training_run
-from churnops.config import load_settings
+from churnops.config import Settings, load_settings
 from churnops.data.ingestion import load_raw_dataset
 from churnops.features.preprocessing import prepare_training_dataset, split_dataset
 from churnops.models.training import TrainingResult, train_baseline_model
@@ -15,10 +16,14 @@ from churnops.models.training import TrainingResult, train_baseline_model
 LOGGER = logging.getLogger(__name__)
 
 
-def run_training(config_path: str | Path) -> tuple[TrainingResult, PersistedRun]:
+def run_training(
+    config_path: str | Path,
+    data_path: str | Path | None = None,
+) -> tuple[TrainingResult, PersistedRun]:
     """Execute the end-to-end local baseline training workflow."""
 
     settings = load_settings(config_path)
+    settings = apply_runtime_overrides(settings, data_path=data_path)
     raw_dataset = load_raw_dataset(settings.data)
     prepared_dataset = prepare_training_dataset(raw_dataset, settings.data)
     data_splits = split_dataset(prepared_dataset.features, prepared_dataset.target, settings.split)
@@ -38,6 +43,28 @@ def run_training(config_path: str | Path) -> tuple[TrainingResult, PersistedRun]
     return training_result, persisted_run
 
 
+def apply_runtime_overrides(
+    settings: Settings,
+    data_path: str | Path | None = None,
+) -> Settings:
+    """Apply CLI-level runtime overrides without mutating the loaded config object."""
+
+    if data_path is None:
+        return settings
+
+    resolved_data_path = Path(data_path).expanduser()
+    if not resolved_data_path.is_absolute():
+        resolved_data_path = (settings.project.root_dir / resolved_data_path).resolve()
+
+    return replace(
+        settings,
+        data=replace(
+            settings.data,
+            raw_data_path=resolved_data_path,
+        ),
+    )
+
+
 def build_argument_parser() -> argparse.ArgumentParser:
     """Build the CLI parser for local training."""
 
@@ -46,6 +73,10 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "--config",
         default="configs/base.yaml",
         help="Path to the YAML configuration file.",
+    )
+    parser.add_argument(
+        "--data-path",
+        help="Optional CSV path that overrides data.raw_data_path from the config.",
     )
     return parser
 
@@ -68,7 +99,13 @@ def main() -> int:
     configure_logging()
 
     try:
-        training_result, persisted_run = run_training(args.config)
+        training_result, persisted_run = run_training(args.config, data_path=args.data_path)
+    except FileNotFoundError as error:
+        LOGGER.error(
+            "%s. Place a churn CSV at that path or rerun with --data-path /path/to/customer_churn.csv.",
+            error,
+        )
+        return 1
     except Exception:
         LOGGER.exception("Training failed.")
         return 1

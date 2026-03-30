@@ -93,3 +93,64 @@ def test_run_training_persists_model_metrics_and_metadata(
     predictions = persisted_model.predict(sample_frame)
 
     assert len(predictions) == 3
+
+
+def test_run_training_allows_runtime_dataset_path_override(
+    dataset_config,
+    churn_fixture_path,
+    tmp_path,
+) -> None:
+    """The training workflow should allow a CLI-level dataset path override."""
+
+    config_path = tmp_path / "training.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "project": {
+                    "name": "churnops-test",
+                    "root_dir": str(tmp_path),
+                },
+                "data": {
+                    "raw_data_path": "data/raw/missing.csv",
+                    "target_column": dataset_config.target_column,
+                    "positive_class": dataset_config.positive_class,
+                    "id_columns": dataset_config.id_columns,
+                    "drop_columns": dataset_config.drop_columns,
+                    "required_columns": dataset_config.required_columns,
+                    "numeric_features": dataset_config.numeric_features,
+                    "categorical_features": dataset_config.categorical_features,
+                    "numeric_coercion_columns": dataset_config.numeric_coercion_columns,
+                    "na_values": dataset_config.na_values,
+                },
+                "split": {
+                    "test_size": 0.25,
+                    "validation_size": 0.25,
+                    "random_state": 42,
+                },
+                "model": {
+                    "name": "logistic_regression",
+                    "params": {
+                        "C": 1.0,
+                        "class_weight": "balanced",
+                        "max_iter": 1000,
+                        "solver": "lbfgs",
+                    },
+                },
+                "artifacts": {
+                    "root_dir": "artifacts",
+                    "training_runs_dir": "training",
+                    "model_filename": "model.joblib",
+                    "metrics_filename": "metrics.json",
+                    "metadata_filename": "metadata.json",
+                    "config_snapshot_filename": "config.yaml",
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    training_result, persisted_run = run_training(config_path, data_path=churn_fixture_path)
+
+    assert training_result.metrics["test"]["accuracy"] is not None
+    assert (persisted_run.run_directory / "model.joblib").exists()

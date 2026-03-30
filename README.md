@@ -65,6 +65,12 @@ Equivalent direct command:
 PYTHONPATH=src python -m churnops.pipeline.train --config configs/base.yaml
 ```
 
+If the dataset lives somewhere else on your machine, override the configured path at runtime:
+
+```bash
+make train DATA_PATH=/absolute/path/to/customer_churn.csv
+```
+
 On success, the pipeline writes a timestamped run directory under `artifacts/training/` containing:
 
 - `model.joblib`: serialized sklearn pipeline with preprocessing and classifier
