@@ -1,10 +1,13 @@
-.PHONY: install-dev platform-down platform-train platform-up serve train test
+.PHONY: install-dev lint platform-down platform-train platform-up serve train test
 
 CONFIG ?= configs/base.yaml
 DATA_PATH ?=
 
 install-dev:
-	pip install -e ".[dev]"
+	python -m pip install -e ".[dev]"
+
+lint:
+	python -m ruff check src tests
 
 train:
 	PYTHONPATH=src python -m churnops.pipeline.train --config $(CONFIG) $(if $(DATA_PATH),--data-path $(DATA_PATH))
@@ -22,4 +25,4 @@ platform-down:
 	docker compose down --remove-orphans
 
 test:
-	PYTHONPATH=src pytest
+	PYTHONPATH=src pytest -q

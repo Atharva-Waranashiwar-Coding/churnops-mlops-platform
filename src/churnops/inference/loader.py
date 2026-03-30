@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -116,7 +116,9 @@ def _resolve_local_model_artifact(settings: Settings) -> tuple[Path, Path | None
     training_root = settings.artifacts.root_dir / settings.artifacts.training_runs_dir
     if inference_settings.local_run_id is not None:
         run_directory = training_root / inference_settings.local_run_id
-        model_path = run_directory / settings.artifacts.model_directory / settings.artifacts.model_filename
+        model_path = (
+            run_directory / settings.artifacts.model_directory / settings.artifacts.model_filename
+        )
         return model_path, run_directory
 
     if not training_root.exists():
@@ -146,12 +148,14 @@ def _resolve_local_model_artifact(settings: Settings) -> tuple[Path, Path | None
         )
 
     run_directory = candidate_runs[0]
-    model_path = run_directory / settings.artifacts.model_directory / settings.artifacts.model_filename
+    model_path = (
+        run_directory / settings.artifacts.model_directory / settings.artifacts.model_filename
+    )
     return model_path, run_directory
 
 
 def _infer_run_directory_from_model_path(settings: Settings, model_path: Path) -> Path | None:
-    """Infer the run directory from a configured local model path when it follows the standard layout."""
+    """Infer the run directory from a configured local model path in the standard layout."""
 
     if model_path.parent.name != settings.artifacts.model_directory:
         return None

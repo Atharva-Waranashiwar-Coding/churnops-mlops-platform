@@ -8,7 +8,12 @@ from churnops.artifacts.persistence import PersistedRun, persist_training_run
 from churnops.config import Settings
 from churnops.data.ingestion import read_raw_dataset
 from churnops.data.validation import DatasetValidationReport, validate_raw_dataset
-from churnops.features.preprocessing import DataSplits, PreparedDataset, prepare_training_dataset, split_dataset
+from churnops.features.preprocessing import (
+    DataSplits,
+    PreparedDataset,
+    prepare_training_dataset,
+    split_dataset,
+)
 from churnops.models.evaluation import EvaluationResult, evaluate_model_splits
 from churnops.models.training import TrainedModel, train_baseline_model
 from churnops.tracking import CompletedTrainingRun, TrackingResult, build_training_tracker

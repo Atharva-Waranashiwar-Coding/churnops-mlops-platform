@@ -29,9 +29,13 @@ def test_load_settings_applies_artifact_directory_defaults(
     assert settings.artifacts.metadata_directory == "metadata"
     assert settings.artifacts.config_directory == "config"
     assert settings.tracking.enabled is False
-    assert settings.tracking.tracking_uri == _sqlite_uri(tmp_path / "artifacts" / "mlflow" / "mlflow.db")
+    assert settings.tracking.tracking_uri == _sqlite_uri(
+        tmp_path / "artifacts" / "mlflow" / "mlflow.db"
+    )
     assert settings.tracking.registry_uri == settings.tracking.tracking_uri
-    assert settings.tracking.artifact_location == (tmp_path / "artifacts" / "mlflow" / "artifacts").resolve().as_uri()
+    assert settings.tracking.artifact_location == (
+        tmp_path / "artifacts" / "mlflow" / "artifacts"
+    ).resolve().as_uri()
     assert settings.inference.model_source == "local_artifact"
     assert settings.inference.prediction_threshold == 0.5
     assert settings.inference.port == 8000

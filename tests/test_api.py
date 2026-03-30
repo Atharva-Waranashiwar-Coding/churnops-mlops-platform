@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi.testclient import TestClient
 import pandas as pd
 import yaml
+from fastapi.testclient import TestClient
 
 from churnops.api.app import create_app
 from churnops.pipeline.train import run_training
@@ -183,7 +183,11 @@ def test_create_app_uses_environment_driven_config_and_model_path(
 def _build_prediction_payload(churn_fixture_path: Path, row_count: int) -> list[dict[str, object]]:
     """Build a prediction payload from the churn fixture without target or ID fields."""
 
-    dataframe = pd.read_csv(churn_fixture_path).drop(columns=["customerID", "Churn"]).head(row_count)
+    dataframe = (
+        pd.read_csv(churn_fixture_path)
+        .drop(columns=["customerID", "Churn"])
+        .head(row_count)
+    )
     return dataframe.to_dict(orient="records")
 
 

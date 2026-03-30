@@ -5,13 +5,19 @@ from __future__ import annotations
 import pytest
 import yaml
 
-mlflow = pytest.importorskip("mlflow")
-
 from churnops.config import load_settings
 from churnops.pipeline.runner import run_local_training
 
 
+@pytest.fixture()
+def mlflow_module():
+    """Return the MLflow module when available."""
+
+    return pytest.importorskip("mlflow")
+
+
 def test_run_local_training_logs_mlflow_run_and_registers_model(
+    mlflow_module,
     dataset_config,
     churn_fixture_path,
     tmp_path,
@@ -26,7 +32,7 @@ def test_run_local_training_logs_mlflow_run_and_registers_model(
     settings = load_settings(config_path)
 
     result = run_local_training(settings)
-    client = mlflow.MlflowClient(
+    client = mlflow_module.MlflowClient(
         tracking_uri=settings.tracking.tracking_uri,
         registry_uri=settings.tracking.registry_uri,
     )
@@ -61,6 +67,7 @@ def test_run_local_training_logs_mlflow_run_and_registers_model(
 
 
 def test_run_local_training_skips_registration_when_metric_does_not_improve(
+    mlflow_module,
     dataset_config,
     churn_fixture_path,
     tmp_path,
@@ -75,7 +82,7 @@ def test_run_local_training_skips_registration_when_metric_does_not_improve(
     settings = load_settings(config_path)
     first_result = run_local_training(settings)
     second_result = run_local_training(settings)
-    client = mlflow.MlflowClient(
+    client = mlflow_module.MlflowClient(
         tracking_uri=settings.tracking.tracking_uri,
         registry_uri=settings.tracking.registry_uri,
     )
