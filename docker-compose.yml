@@ -1,0 +1,77 @@
+x-churnops-image: &churnops-image
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: churnops/inference-api:local
+
+x-churnops-volumes: &churnops-volumes
+  - ./artifacts:/app/artifacts
+  - ./configs:/app/configs:ro
+  - ./data:/app/data
+
+x-runtime-env: &runtime-env
+  CHURNOPS_CONFIG: ${CHURNOPS_CONFIG:-configs/base.yaml}
+  CHURNOPS_DATA_PATH: ${CHURNOPS_DATA_PATH:-data/raw/customer_churn.csv}
+  CHURNOPS_TRACKING_URI: ${CHURNOPS_TRACKING_URI:-sqlite:///artifacts/mlflow/mlflow.db}
+  CHURNOPS_REGISTRY_URI: ${CHURNOPS_REGISTRY_URI:-sqlite:///artifacts/mlflow/mlflow.db}
+  CHURNOPS_TRACKING_ARTIFACT_LOCATION: ${CHURNOPS_TRACKING_ARTIFACT_LOCATION:-artifacts/mlflow/artifacts}
+
+services:
+  inference-api:
+    <<: *churnops-image
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      <<: *runtime-env
+      CHURNOPS_INFERENCE_HOST: ${CHURNOPS_INFERENCE_HOST:-0.0.0.0}
+      CHURNOPS_INFERENCE_PORT: ${CHURNOPS_INFERENCE_PORT:-8000}
+      CHURNOPS_INFERENCE_MODEL_SOURCE: ${CHURNOPS_INFERENCE_MODEL_SOURCE:-local_artifact}
+      CHURNOPS_INFERENCE_PRELOAD_MODEL: ${CHURNOPS_INFERENCE_PRELOAD_MODEL:-true}
+      CHURNOPS_INFERENCE_LOCAL_RUN_ID: ${CHURNOPS_INFERENCE_LOCAL_RUN_ID:-}
+      CHURNOPS_INFERENCE_LOCAL_MODEL_PATH: ${CHURNOPS_INFERENCE_LOCAL_MODEL_PATH:-}
+      CHURNOPS_INFERENCE_MODEL_URI: ${CHURNOPS_INFERENCE_MODEL_URI:-}
+      CHURNOPS_INFERENCE_REGISTERED_MODEL_NAME: ${CHURNOPS_INFERENCE_REGISTERED_MODEL_NAME:-}
+      CHURNOPS_INFERENCE_REGISTERED_MODEL_ALIAS: ${CHURNOPS_INFERENCE_REGISTERED_MODEL_ALIAS:-}
+      CHURNOPS_INFERENCE_REGISTERED_MODEL_VERSION: ${CHURNOPS_INFERENCE_REGISTERED_MODEL_VERSION:-}
+      CHURNOPS_INFERENCE_PREDICTION_THRESHOLD: ${CHURNOPS_INFERENCE_PREDICTION_THRESHOLD:-0.5}
+    ports:
+      - "${CHURNOPS_INFERENCE_PORT:-8000}:${CHURNOPS_INFERENCE_PORT:-8000}"
+    volumes: *churnops-volumes
+
+  trainer:
+    <<: *churnops-image
+    profiles:
+      - ops
+    init: true
+    env_file:
+      - .env
+    environment:
+      <<: *runtime-env
+    command: ["churnops-train"]
+    volumes: *churnops-volumes
+
+  mlflow:
+    <<: *churnops-image
+    profiles:
+      - ops
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      <<: *runtime-env
+      MLFLOW_UI_PORT: ${MLFLOW_UI_PORT:-5000}
+    command:
+      - mlflow
+      - ui
+      - --host
+      - 0.0.0.0
+      - --port
+      - ${MLFLOW_UI_PORT:-5000}
+      - --backend-store-uri
+      - ${CHURNOPS_TRACKING_URI:-sqlite:///artifacts/mlflow/mlflow.db}
+    ports:
+      - "${MLFLOW_UI_PORT:-5000}:${MLFLOW_UI_PORT:-5000}"
+    volumes: *churnops-volumes
