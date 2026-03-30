@@ -1,19 +1,21 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 05 adds containerization and a Docker Compose-based local platform so the inference service can run through a realistic product workflow with environment-driven runtime configuration.
+ChurnOps is a production-style MLOps project for customer churn prediction. Phase 06 adds GitHub Actions-based quality gates so linting, tests, package build checks, and Docker build validation run automatically against the current local-platform architecture.
 
-## Phase 05 Scope
+## Phase 06 Scope
 
-- keep training, inference, artifact persistence, and MLflow integration intact from earlier phases
-- add a production-minded Docker image for the inference service
-- add a practical Docker Compose stack for local platform development
-- make runtime configuration environment-driven for containers and CI
-- stabilize startup so empty local volumes do not break the platform bootstrap
+- keep training, inference, tracking, and containerization intact from earlier phases
+- add automated GitHub Actions checks for linting, tests, and package build validation
+- validate the inference Docker image in CI without pushing artifacts
+- keep CI feedback fast enough for normal pull request work
+- document the relationship between local commands and CI expectations
 
 ## Repository Layout
 
 ```text
 .
+├── .github/
+│   └── workflows/            # GitHub Actions quality gates
 ├── artifacts/                # local training outputs (gitignored)
 ├── configs/
 │   └── base.yaml             # default training configuration
@@ -232,9 +234,26 @@ Useful environment variables:
 
 The image uses a non-root runtime user, an explicit healthcheck, and a small entrypoint bootstrap so empty bind mounts still produce the required local runtime directories.
 
-## Running Tests
+## Continuous Integration
+
+GitHub Actions now enforces the main quality gates for pushes to `develop`, pushes to `phase/**` branches, and pull requests:
+
+- `.github/workflows/ci.yml`: package build validation plus separate lint and test jobs
+- `.github/workflows/docker-build.yml`: inference image build validation for Docker-relevant changes
+
+The CI design mirrors local developer commands instead of introducing a separate automation-only path:
+
+- `make lint`: Ruff import/style/static checks across `src/` and `tests/`
+- `make test`: pytest suite against the local fixture-backed workflow
+- `python -m build --no-isolation`: package build validation
+- `docker build --file Dockerfile --target runtime --tag churnops/inference-api:ci .`: image build validation
+
+The Python workflow uses pip caching, timeout limits, and concurrency cancellation to reduce wasted CI time. The Docker workflow is path-scoped so documentation-only or unrelated config changes do not pay for a full image build.
+
+## Running Quality Checks
 
 ```bash
+make lint
 make test
 ```
 
