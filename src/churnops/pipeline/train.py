@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
 import logging
 from pathlib import Path
 
 from churnops.artifacts.persistence import PersistedRun, persist_training_run
-from churnops.config import Settings, load_settings
+from churnops.config import apply_runtime_overrides, load_settings
 from churnops.data.ingestion import load_raw_dataset
 from churnops.features.preprocessing import prepare_training_dataset, split_dataset
 from churnops.models.training import TrainingResult, train_baseline_model
@@ -41,28 +40,6 @@ def run_training(
         source_row_count=int(raw_dataset.shape[0]),
     )
     return training_result, persisted_run
-
-
-def apply_runtime_overrides(
-    settings: Settings,
-    data_path: str | Path | None = None,
-) -> Settings:
-    """Apply CLI-level runtime overrides without mutating the loaded config object."""
-
-    if data_path is None:
-        return settings
-
-    resolved_data_path = Path(data_path).expanduser()
-    if not resolved_data_path.is_absolute():
-        resolved_data_path = (settings.project.root_dir / resolved_data_path).resolve()
-
-    return replace(
-        settings,
-        data=replace(
-            settings.data,
-            raw_data_path=resolved_data_path,
-        ),
-    )
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
