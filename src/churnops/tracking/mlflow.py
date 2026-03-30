@@ -72,7 +72,8 @@ class MLflowTrainingTracker:
         self._log_params(completed_run)
         self._log_metrics(completed_run)
         self._log_local_artifacts(completed_run)
-        self._log_model_artifact(completed_run)
+        model_uri = self._log_model_artifact(completed_run)
+        model_registry_result = self._register_best_model(completed_run, model_uri)
 
         return TrackingResult(
             enabled=True,
@@ -83,6 +84,7 @@ class MLflowTrainingTracker:
             tracking_uri=self._settings.tracking.tracking_uri,
             registry_uri=self._settings.tracking.registry_uri,
             artifact_uri=self._artifact_uri,
+            model_registry=model_registry_result,
         )
 
     def _build_run_name(self) -> str:
