@@ -1,0 +1,22 @@
+name: Docker Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - "phase/**"
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build inference service image
+        run: docker build --file Dockerfile --target runtime --tag churnops/inference-api:ci .
