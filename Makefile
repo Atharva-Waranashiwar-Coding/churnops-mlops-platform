@@ -4,7 +4,7 @@ CONFIG ?= configs/base.yaml
 DATA_PATH ?=
 
 install-dev:
-	pip install -e ".[dev]"
+	python -m pip install -e ".[dev]"
 
 lint:
 	python -m ruff check src tests
@@ -25,4 +25,4 @@ platform-down:
 	docker compose down --remove-orphans
 
 test:
-	PYTHONPATH=src pytest
+	PYTHONPATH=src pytest -q

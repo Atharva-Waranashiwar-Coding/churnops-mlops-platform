@@ -2,18 +2,37 @@ name: Docker Build
 
 on:
   pull_request:
+    paths:
+      - Dockerfile
+      - docker/**
+      - src/**
+      - pyproject.toml
+      - configs/**
+      - .github/workflows/docker-build.yml
   push:
     branches:
       - develop
       - "phase/**"
+    paths:
+      - Dockerfile
+      - docker/**
+      - src/**
+      - pyproject.toml
+      - configs/**
+      - .github/workflows/docker-build.yml
 
 permissions:
   contents: read
+
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
