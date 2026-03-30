@@ -8,6 +8,8 @@
 /data/processed/*
 !/data/processed/.gitignore
 /src/*.egg-info/
+/mlartifacts/
+/mlruns/
 __pycache__/
 *.pyc
 .DS_Store
