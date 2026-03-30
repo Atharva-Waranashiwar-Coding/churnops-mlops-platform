@@ -69,6 +69,7 @@ def dataset_config(churn_fixture_path: Path) -> DatasetConfig:
         raw_data_path=churn_fixture_path,
         target_column="Churn",
         positive_class="Yes",
+        column_renames={},
         id_columns=["customerID"],
         drop_columns=[],
         required_columns=FIXTURE_COLUMNS,
@@ -76,4 +77,5 @@ def dataset_config(churn_fixture_path: Path) -> DatasetConfig:
         categorical_features=CATEGORICAL_FEATURES,
         numeric_coercion_columns=["TotalCharges"],
         na_values=["", " "],
+        infer_remaining_features=False,
     )

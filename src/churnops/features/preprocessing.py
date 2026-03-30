@@ -221,6 +221,13 @@ def _resolve_feature_spec(
             + ", ".join(sorted(overlap))
         )
 
+    if configured_numeric or configured_categorical:
+        if not config.infer_remaining_features:
+            return FeatureSpec(
+                numeric_features=configured_numeric,
+                categorical_features=configured_categorical,
+            )
+
     assigned_columns = set(configured_numeric).union(configured_categorical)
     remaining_columns = [column for column in features.columns if column not in assigned_columns]
 

@@ -35,3 +35,35 @@ def test_load_raw_dataset_raises_when_target_column_is_missing(
 
     with pytest.raises(ValueError, match="Target column 'Churn'"):
         load_raw_dataset(broken_config)
+
+
+def test_load_raw_dataset_applies_configured_column_renames(
+    dataset_config,
+    tmp_path,
+) -> None:
+    """The ingestion layer should rename raw schema variants into canonical columns."""
+
+    renamed_dataset_path = tmp_path / "renamed_dataset.csv"
+    renamed_dataset_path.write_text(
+        "CustomerID,Gender,Churn Label\n0001-AAAAA,Female,Yes\n",
+        encoding="utf-8",
+    )
+
+    renamed_config = replace(
+        dataset_config,
+        raw_data_path=renamed_dataset_path,
+        required_columns=["customerID", "gender", "Churn"],
+        id_columns=["customerID"],
+        numeric_features=[],
+        categorical_features=["gender"],
+        numeric_coercion_columns=[],
+        column_renames={
+            "CustomerID": "customerID",
+            "Gender": "gender",
+            "Churn Label": "Churn",
+        },
+    )
+
+    dataset = load_raw_dataset(renamed_config)
+
+    assert list(dataset.columns) == ["customerID", "gender", "Churn"]

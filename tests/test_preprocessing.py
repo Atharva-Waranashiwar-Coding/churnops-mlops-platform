@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pandas as pd
 
 from churnops.config import SplitConfig
@@ -54,3 +56,25 @@ def test_build_preprocessor_and_split_dataset_create_trainable_outputs(
         len(splits.X_train) + len(splits.X_validation) + len(splits.X_test)
         == len(prepared_dataset.features)
     )
+
+
+def test_prepare_training_dataset_uses_explicit_feature_lists_by_default(
+    dataset_config,
+) -> None:
+    """Configured feature lists should prevent accidental use of unexpected columns."""
+
+    raw_dataset = load_raw_dataset(dataset_config)
+    raw_dataset["LeakageScore"] = 999
+
+    strict_config = replace(
+        dataset_config,
+        numeric_features=["tenure"],
+        categorical_features=["gender"],
+    )
+
+    prepared_dataset = prepare_training_dataset(raw_dataset, strict_config)
+
+    assert prepared_dataset.feature_spec.numeric_features == ["tenure"]
+    assert prepared_dataset.feature_spec.categorical_features == ["gender"]
+    assert "LeakageScore" in prepared_dataset.features.columns
+    assert "LeakageScore" not in prepared_dataset.feature_spec.all_features

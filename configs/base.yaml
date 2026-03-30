@@ -6,9 +6,40 @@ data:
   raw_data_path: data/raw/customer_churn.csv
   target_column: Churn
   positive_class: "Yes"
+  column_renames:
+    CustomerID: customerID
+    Gender: gender
+    Senior Citizen: SeniorCitizen
+    Phone Service: PhoneService
+    Multiple Lines: MultipleLines
+    Internet Service: InternetService
+    Online Security: OnlineSecurity
+    Online Backup: OnlineBackup
+    Device Protection: DeviceProtection
+    Tech Support: TechSupport
+    Streaming TV: StreamingTV
+    Streaming Movies: StreamingMovies
+    Paperless Billing: PaperlessBilling
+    Payment Method: PaymentMethod
+    Monthly Charges: MonthlyCharges
+    Total Charges: TotalCharges
+    Tenure Months: tenure
+    Churn Label: Churn
   id_columns:
     - customerID
-  drop_columns: []
+  drop_columns:
+    - Count
+    - Country
+    - State
+    - City
+    - Zip Code
+    - Lat Long
+    - Latitude
+    - Longitude
+    - Churn Value
+    - Churn Score
+    - CLTV
+    - Churn Reason
   required_columns:
     - customerID
     - gender
@@ -57,6 +88,7 @@ data:
   na_values:
     - ""
     - " "
+  infer_remaining_features: false
 
 split:
   test_size: 0.2

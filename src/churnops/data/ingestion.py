@@ -21,7 +21,7 @@ def load_raw_dataset(config: DatasetConfig) -> pd.DataFrame:
         na_values=config.na_values or None,
         keep_default_na=True,
     )
-    dataframe.columns = dataframe.columns.str.strip()
+    dataframe = _standardize_columns(dataframe, config)
 
     if dataframe.empty:
         raise ValueError(f"Dataset file is empty: {dataset_path}")
@@ -34,7 +34,11 @@ def _validate_required_columns(dataframe: pd.DataFrame, config: DatasetConfig) -
     """Ensure the raw dataset contains the configured contract columns."""
 
     if config.target_column not in dataframe.columns:
-        raise ValueError(f"Target column '{config.target_column}' was not found in the dataset.")
+        available_columns = ", ".join(dataframe.columns.tolist())
+        raise ValueError(
+            f"Target column '{config.target_column}' was not found in the dataset. "
+            f"Available columns: {available_columns}"
+        )
 
     required_columns = set(config.required_columns)
     missing_columns = sorted(required_columns.difference(dataframe.columns))
@@ -42,3 +46,17 @@ def _validate_required_columns(dataframe: pd.DataFrame, config: DatasetConfig) -
         raise ValueError(
             "Dataset is missing required columns: " + ", ".join(missing_columns)
         )
+
+
+def _standardize_columns(dataframe: pd.DataFrame, config: DatasetConfig) -> pd.DataFrame:
+    """Normalize raw column names and apply configured rename aliases."""
+
+    standardized = dataframe.copy()
+    standardized.columns = (
+        standardized.columns.astype(str).str.replace("\ufeff", "", regex=False).str.strip()
+    )
+
+    if config.column_renames:
+        standardized = standardized.rename(columns=config.column_renames)
+
+    return standardized

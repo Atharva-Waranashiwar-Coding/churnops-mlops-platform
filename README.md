@@ -47,7 +47,9 @@ pip install -e ".[dev]"
 
 ## Dataset Contract
 
-The default configuration expects a telecom churn CSV at `data/raw/customer_churn.csv` using the IBM Telco-style schema defined in `configs/base.yaml`. The target column is `Churn`, the positive class is `Yes`, and `customerID` is excluded from modeling.
+The default configuration expects a telecom churn CSV at `data/raw/customer_churn.csv`. The shipped `configs/base.yaml` is aligned to the common Telco churn export variant with columns such as `CustomerID`, `Tenure Months`, `Monthly Charges`, and `Churn Label`.
+
+At ingestion time, those raw headers are renamed into a stable internal schema such as `customerID`, `tenure`, `MonthlyCharges`, `TotalCharges`, and `Churn`. The target column is `Churn`, the positive class is `Yes`, and `customerID` is excluded from modeling.
 
 If your dataset lives elsewhere or uses different split ratios or model settings, copy `configs/base.yaml` and update the path and parameters there.
 
@@ -88,4 +90,5 @@ make test
 
 - `src/` package layout keeps the codebase ready for packaging, CI, Docker, and service integration.
 - configuration is separated from implementation so later phases can extend the training workflow without rewriting module boundaries.
+- the feature contract is explicit by default, which prevents accidental training on unexpected or leakage-prone columns.
 - the persisted model artifact is a full sklearn pipeline, which keeps future FastAPI inference integration straightforward.

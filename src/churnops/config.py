@@ -24,6 +24,7 @@ class DatasetConfig:
     raw_data_path: Path
     target_column: str
     positive_class: str
+    column_renames: dict[str, str] = field(default_factory=dict)
     id_columns: list[str] = field(default_factory=list)
     drop_columns: list[str] = field(default_factory=list)
     required_columns: list[str] = field(default_factory=list)
@@ -31,6 +32,7 @@ class DatasetConfig:
     categorical_features: list[str] = field(default_factory=list)
     numeric_coercion_columns: list[str] = field(default_factory=list)
     na_values: list[str] = field(default_factory=list)
+    infer_remaining_features: bool = False
 
 
 @dataclass(slots=True)
@@ -115,6 +117,10 @@ def load_settings(config_path: str | Path) -> Settings:
         raw_data_path=_resolve_path(project.root_dir, data_section["raw_data_path"]),
         target_column=str(data_section["target_column"]),
         positive_class=str(data_section.get("positive_class", "Yes")),
+        column_renames=_as_string_mapping(
+            data_section.get("column_renames", {}),
+            "data.column_renames",
+        ),
         id_columns=_as_string_list(data_section.get("id_columns", []), "data.id_columns"),
         drop_columns=_as_string_list(data_section.get("drop_columns", []), "data.drop_columns"),
         required_columns=_as_string_list(data_section.get("required_columns", []), "data.required_columns"),
@@ -128,6 +134,7 @@ def load_settings(config_path: str | Path) -> Settings:
             "data.numeric_coercion_columns",
         ),
         na_values=_as_string_list(data_section.get("na_values", []), "data.na_values"),
+        infer_remaining_features=bool(data_section.get("infer_remaining_features", False)),
     )
 
     split = SplitConfig(
@@ -189,3 +196,12 @@ def _as_string_list(value: Any, section_name: str) -> list[str]:
     if len(set(string_list)) != len(string_list):
         raise ValueError(f"Configuration section '{section_name}' contains duplicate values.")
     return string_list
+
+
+def _as_string_mapping(value: Any, section_name: str) -> dict[str, str]:
+    """Ensure a configuration field is a string-to-string mapping."""
+
+    if not isinstance(value, dict):
+        raise ValueError(f"Configuration section '{section_name}' must be a mapping.")
+
+    return {str(key): str(item) for key, item in value.items()}
