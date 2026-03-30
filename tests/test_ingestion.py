@@ -6,7 +6,7 @@ from dataclasses import replace
 
 import pytest
 
-from churnops.data.ingestion import load_raw_dataset
+from churnops.data.ingestion import load_raw_dataset, read_raw_dataset
 
 
 def test_load_raw_dataset_reads_csv_fixture(dataset_config) -> None:
@@ -64,6 +64,6 @@ def test_load_raw_dataset_applies_configured_column_renames(
         },
     )
 
-    dataset = load_raw_dataset(renamed_config)
+    dataset = read_raw_dataset(renamed_config)
 
     assert list(dataset.columns) == ["customerID", "gender", "Churn"]
