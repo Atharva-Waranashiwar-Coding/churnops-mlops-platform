@@ -39,6 +39,15 @@ def test_load_settings_applies_artifact_directory_defaults(
     assert settings.inference.model_source == "local_artifact"
     assert settings.inference.prediction_threshold == 0.5
     assert settings.inference.port == 8000
+    assert settings.drift.enabled is True
+    assert settings.drift.storage_dir == (
+        tmp_path / "artifacts" / "monitoring" / "drift"
+    ).resolve()
+    assert settings.drift.window_size == 200
+    assert settings.drift.min_samples == 100
+    assert settings.drift.psi_drift_threshold == 0.25
+    assert settings.drift.retraining.enabled is False
+    assert settings.drift.retraining.backend == "disabled"
     assert settings.orchestration.workspace_dir == (
         tmp_path / "artifacts" / "orchestration"
     ).resolve()
@@ -93,6 +102,22 @@ def test_apply_runtime_overrides_reads_environment_variables(
             "CHURNOPS_INFERENCE_PRELOAD_MODEL": "false",
             "CHURNOPS_INFERENCE_HOST": "0.0.0.0",
             "CHURNOPS_INFERENCE_PORT": "8010",
+            "CHURNOPS_DRIFT_STORAGE_DIR": "runtime/drift",
+            "CHURNOPS_DRIFT_WINDOW_SIZE": "50",
+            "CHURNOPS_DRIFT_MIN_SAMPLES": "25",
+            "CHURNOPS_DRIFT_NUMERIC_BIN_COUNT": "8",
+            "CHURNOPS_DRIFT_CATEGORICAL_TOP_K": "12",
+            "CHURNOPS_DRIFT_PSI_WARNING_THRESHOLD": "0.05",
+            "CHURNOPS_DRIFT_PSI_DRIFT_THRESHOLD": "0.2",
+            "CHURNOPS_DRIFT_MIN_DRIFTED_FEATURES": "1",
+            "CHURNOPS_DRIFT_RETRAINING_ENABLED": "true",
+            "CHURNOPS_DRIFT_RETRAINING_BACKEND": "airflow_api",
+            "CHURNOPS_DRIFT_AIRFLOW_API_URL": "http://airflow.example/api/v1",
+            "CHURNOPS_DRIFT_AIRFLOW_DAG_ID": "drift-retrain-dag",
+            "CHURNOPS_DRIFT_AIRFLOW_USERNAME": "ops-user",
+            "CHURNOPS_DRIFT_AIRFLOW_PASSWORD": "ops-pass",
+            "CHURNOPS_DRIFT_RETRAINING_COOLDOWN_MINUTES": "90",
+            "CHURNOPS_DRIFT_RETRAINING_REQUEST_TIMEOUT_SECONDS": "20",
             "CHURNOPS_ORCHESTRATION_WORKSPACE_DIR": "runtime/orchestration",
             "CHURNOPS_AIRFLOW_DAG_ID": "custom-training-dag",
             "CHURNOPS_AIRFLOW_SCHEDULE": "0 0 * * *",
@@ -117,6 +142,22 @@ def test_apply_runtime_overrides_reads_environment_variables(
     assert overridden.inference.preload_model is False
     assert overridden.inference.host == "0.0.0.0"
     assert overridden.inference.port == 8010
+    assert overridden.drift.storage_dir == (tmp_path / "runtime" / "drift").resolve()
+    assert overridden.drift.window_size == 50
+    assert overridden.drift.min_samples == 25
+    assert overridden.drift.numeric_bin_count == 8
+    assert overridden.drift.categorical_top_k == 12
+    assert overridden.drift.psi_warning_threshold == 0.05
+    assert overridden.drift.psi_drift_threshold == 0.2
+    assert overridden.drift.min_drifted_features == 1
+    assert overridden.drift.retraining.enabled is True
+    assert overridden.drift.retraining.backend == "airflow_api"
+    assert overridden.drift.retraining.airflow_api_url == "http://airflow.example/api/v1"
+    assert overridden.drift.retraining.dag_id == "drift-retrain-dag"
+    assert overridden.drift.retraining.username == "ops-user"
+    assert overridden.drift.retraining.password == "ops-pass"
+    assert overridden.drift.retraining.cooldown_minutes == 90
+    assert overridden.drift.retraining.request_timeout_seconds == 20
     assert overridden.orchestration.workspace_dir == (
         tmp_path / "runtime" / "orchestration"
     ).resolve()
@@ -151,6 +192,7 @@ def test_ensure_runtime_directories_creates_tracking_and_artifact_paths(
 
     assert (tmp_path / "artifacts").exists()
     assert (tmp_path / "artifacts" / "training").exists()
+    assert (tmp_path / "artifacts" / "monitoring" / "drift").exists()
     assert (tmp_path / "artifacts" / "orchestration").exists()
     assert (tmp_path / "runtime" / "mlflow").exists()
     assert (tmp_path / "runtime" / "mlflow" / "artifacts").exists()
@@ -234,6 +276,7 @@ def _write_training_config(
     dataset_config,
     tracking: dict | None = None,
     inference: dict | None = None,
+    drift: dict | None = None,
 ) -> Path:
     """Create a minimal training config for configuration-focused tests."""
 
@@ -278,6 +321,7 @@ def _write_training_config(
                 },
                 **({"tracking": tracking} if tracking is not None else {}),
                 **({"inference": inference} if inference is not None else {}),
+                **({"drift": drift} if drift is not None else {}),
             },
             sort_keys=False,
         ),
