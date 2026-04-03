@@ -1,15 +1,16 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 08 adds monitoring and observability so the inference service exposes production-minded Prometheus metrics and the local platform includes Prometheus and Grafana for operational visibility.
+ChurnOps is a production-style MLOps project for customer churn prediction. Phase 09 adds drift-aware monitoring and retraining so the system can persist training baselines, compare live inference inputs against them, log drift events, and trigger the existing Airflow retraining workflow when configured thresholds are met.
 
-## Phase 08 Scope
+## Phase 09 Scope
 
 - keep the current training, tracking, inference, and containerization layers intact
-- add Prometheus-compatible metrics to the FastAPI inference service
-- track API-level request throughput, latency, and failures without pushing metric code into handlers
-- track ML-facing prediction volume, batch shape, output mix, and churn-probability distribution
-- add Prometheus and Grafana to the local platform with provisioned config and dashboards
-- document monitoring usage and operational expectations
+- persist a reference input baseline from the training split as part of each training run
+- detect live feature-distribution drift with a simple PSI-based strategy over a rolling inference window
+- write structured drift events and persisted monitor state for operational auditability
+- trigger the existing Airflow training DAG when drift thresholds and cooldown policy allow it
+- keep drift monitoring, inference serving, and orchestration responsibilities separated
+- document the drift lifecycle and local retraining workflow
 
 ## Repository Layout
 
@@ -41,6 +42,7 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 │       ├── features/         # preprocessing and dataset splitting
 │       ├── models/           # estimator training and metrics
 │       ├── pipeline/         # runner orchestration and CLI entrypoint
+│       ├── drift/            # training baselines, live drift detection, and retraining triggers
 │       ├── inference/        # model loading and prediction service layer
 │       ├── monitoring/       # Prometheus metrics and request instrumentation
 │       ├── api/              # FastAPI app bootstrap, routes, and schemas
@@ -102,6 +104,7 @@ On success, the pipeline writes a timestamped run directory under `artifacts/tra
 - `metrics/metrics.json`: train, validation, and test metrics
 - `metadata/run.json`: run metadata, config provenance, and artifact paths
 - `metadata/validation.json`: raw dataset validation summary
+- `metadata/drift_baseline.json`: training-split baseline used for live drift monitoring
 - `config/training.yaml`: snapshot of the resolved training config
 
 ## Experiment Tracking
@@ -133,8 +136,9 @@ The local training runner executes these stages:
 2. validate the dataset contract and target availability
 3. prepare features and targets, then split train/validation/test data
 4. train the configured baseline estimator
-5. evaluate each split and persist a structured local training run
-6. track the run in MLflow and register the model if it is the current best candidate
+5. evaluate each split and build a training-input baseline for drift monitoring
+6. persist a structured local training run, including the drift baseline
+7. track the run in MLflow and register the model if it is the current best candidate
 
 Phase 07 keeps those same stages, but exposes them through a stage-oriented orchestration layer so Airflow can execute them as separate tasks with filesystem-backed handoff artifacts between task boundaries.
 
@@ -155,7 +159,7 @@ The DAG task sequence is:
 4. preprocess features and create train, validation, and test splits
 5. train the configured baseline model
 6. evaluate model metrics across splits
-7. persist artifacts, log to MLflow, and run the model-registration policy
+7. persist artifacts, generate the drift baseline, log to MLflow, and run the model-registration policy
 
 The DAG schedule and retry settings live under the `orchestration.airflow` section in `configs/base.yaml` and can be overridden with `CHURNOPS_AIRFLOW_*` environment variables at runtime.
 
@@ -253,6 +257,46 @@ For a quick local check after the API is running:
 curl -s http://localhost:8000/metrics | head
 ```
 
+## Drift Detection And Retraining
+
+Drift monitoring is attached to the inference service, but it is not implemented inside the route handlers. Successful prediction requests pass their feature frame into `churnops.drift.monitor.DriftMonitor`, which maintains a rolling observation window under `artifacts/monitoring/drift/<monitor_key>/`.
+
+The first implementation uses a PSI-based comparison between the live inference window and the persisted training baseline:
+
+- numeric features use quantile-derived buckets from the training split, plus an explicit missing bucket
+- categorical features track the top observed training categories, plus `__other__` and `__missing__`
+- each feature is marked `stable`, `warning`, or `drift` from the configured PSI thresholds
+- the overall window becomes `drift_detected` only when at least `drift.min_drifted_features` features cross the drift threshold
+
+That keeps the detector simple enough to reason about while still capturing meaningful input-distribution shifts.
+
+Each evaluated window can persist:
+
+- `observation_window.joblib`: the current rolling inference window for the monitored model
+- `state.json`: previous status, last evaluation time, and retraining cooldown state
+- `events/<timestamp>_<status>.json`: structured drift events with thresholds, per-feature PSI results, and retraining trigger outcomes
+
+The main drift settings live under `drift:` in `configs/base.yaml` and can be overridden with `CHURNOPS_DRIFT_*` environment variables:
+
+- `drift.window_size` and `drift.min_samples`: control how much live traffic is required before evaluation
+- `drift.numeric_bin_count` and `drift.categorical_top_k`: define the baseline bucket shape
+- `drift.psi_warning_threshold` and `drift.psi_drift_threshold`: control feature-level sensitivity
+- `drift.min_drifted_features`: keeps one noisy feature from triggering a full retraining decision
+- `drift.retraining.*`: selects and configures the retraining backend
+
+The shipped base config keeps retraining disabled by default. When you want automated retraining, enable the Airflow backend with environment variables such as:
+
+```bash
+export CHURNOPS_DRIFT_RETRAINING_ENABLED=true
+export CHURNOPS_DRIFT_RETRAINING_BACKEND=airflow_api
+export CHURNOPS_DRIFT_AIRFLOW_API_URL=http://localhost:8080/api/v1
+export CHURNOPS_DRIFT_AIRFLOW_DAG_ID=churnops_training_pipeline
+export CHURNOPS_DRIFT_AIRFLOW_USERNAME=admin
+export CHURNOPS_DRIFT_AIRFLOW_PASSWORD=admin
+```
+
+When enabled, the drift monitor does not rerun training logic itself. It calls the existing Airflow DAG through the stable REST API and passes the drift event context in the DAG run `conf` payload.
+
 ## Containerized Local Platform
 
 The repository now includes a Docker image for the inference service and a `docker-compose.yml` stack for local platform workflows. Runtime behavior is driven through `CHURNOPS_*` environment variables so the same image can support local development, CI smoke tests, and later deployment targets.
@@ -308,6 +352,8 @@ Useful environment variables:
 - `CHURNOPS_INFERENCE_MODEL_URI`: explicit MLflow model URI
 - `CHURNOPS_INFERENCE_REGISTERED_MODEL_NAME`, `CHURNOPS_INFERENCE_REGISTERED_MODEL_ALIAS`, `CHURNOPS_INFERENCE_REGISTERED_MODEL_VERSION`: MLflow registry model selection
 - `CHURNOPS_TRACKING_URI`, `CHURNOPS_REGISTRY_URI`, `CHURNOPS_TRACKING_ARTIFACT_LOCATION`: shared tracking backend configuration
+- `CHURNOPS_DRIFT_ENABLED`, `CHURNOPS_DRIFT_WINDOW_SIZE`, `CHURNOPS_DRIFT_MIN_SAMPLES`, `CHURNOPS_DRIFT_PSI_WARNING_THRESHOLD`, `CHURNOPS_DRIFT_PSI_DRIFT_THRESHOLD`, `CHURNOPS_DRIFT_MIN_DRIFTED_FEATURES`: live drift detection controls
+- `CHURNOPS_DRIFT_RETRAINING_ENABLED`, `CHURNOPS_DRIFT_RETRAINING_BACKEND`, `CHURNOPS_DRIFT_AIRFLOW_API_URL`, `CHURNOPS_DRIFT_AIRFLOW_DAG_ID`, `CHURNOPS_DRIFT_AIRFLOW_USERNAME`, `CHURNOPS_DRIFT_AIRFLOW_PASSWORD`: retraining trigger controls
 - `MLFLOW_UI_PORT`: host port for the MLflow UI service
 - `PROMETHEUS_PORT`: host port for the local Prometheus UI
 - `GRAFANA_PORT`, `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`: local Grafana access configuration
@@ -330,6 +376,16 @@ make airflow-up
 ```
 
 With the default `.env.example`, the Airflow UI is available at `http://localhost:8080` and the DAG runs on the configured cron schedule of `0 3 * * 1`.
+
+To enable drift-triggered retraining in the local platform:
+
+1. copy `.env.example` to `.env`
+2. set `CHURNOPS_DRIFT_RETRAINING_ENABLED=true`
+3. run `make airflow-init`
+4. run `make airflow-up`
+5. start the API stack with `make platform-up`
+
+Inside Docker Compose, the inference API points its retraining trigger at `http://airflow-webserver:8080/api/v1`, while local non-container runs should use `http://localhost:8080/api/v1`.
 
 Prometheus scrapes the API at `inference-api:8000/metrics`, and Grafana ships with a provisioned dashboard for:
 
