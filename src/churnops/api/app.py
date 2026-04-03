@@ -18,6 +18,11 @@ from churnops.api.routes import router
 from churnops.config import Settings, get_default_config_path, load_runtime_settings
 from churnops.inference import InferenceService
 from churnops.inference.exceptions import InferenceError, ModelLoadError, PredictionError
+from churnops.monitoring import (
+    InferenceMetrics,
+    RequestMetricsMiddleware,
+    build_metrics_asgi_app,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,10 +34,11 @@ def create_app(
     """Create the FastAPI application for churn inference."""
 
     resolved_settings = settings or load_runtime_settings(config_path)
+    metrics = InferenceMetrics()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        service = InferenceService(resolved_settings)
+        service = InferenceService(resolved_settings, metrics=metrics)
         app.state.settings = resolved_settings
         app.state.inference_service = service
         if resolved_settings.inference.preload_model:
@@ -47,6 +53,9 @@ def create_app(
         version=__version__,
         lifespan=lifespan,
     )
+    app.state.metrics = metrics
+    app.add_middleware(RequestMetricsMiddleware, metrics=metrics)
+    app.mount("/metrics", build_metrics_asgi_app(metrics.registry))
     _register_exception_handlers(app)
     app.include_router(router)
     return app
