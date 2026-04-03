@@ -16,7 +16,7 @@ serve:
 	PYTHONPATH=src python -m churnops.api.app --config $(CONFIG)
 
 platform-up:
-	docker compose up --build inference-api
+	docker compose up --build inference-api prometheus grafana
 
 platform-train:
 	docker compose run --rm --profile ops trainer

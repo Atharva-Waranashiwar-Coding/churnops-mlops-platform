@@ -1,14 +1,15 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 07 adds Airflow-based orchestration so the existing training system can run as a scheduled, task-oriented retraining workflow without duplicating model logic.
+ChurnOps is a production-style MLOps project for customer churn prediction. Phase 08 adds monitoring and observability so the inference service exposes production-minded Prometheus metrics and the local platform includes Prometheus and Grafana for operational visibility.
 
-## Phase 07 Scope
+## Phase 08 Scope
 
 - keep the current training, tracking, inference, and containerization layers intact
-- add Airflow orchestration around the existing training stages instead of rewriting them in DAG code
-- support scheduled retraining with configurable DAG schedule and retry behavior
-- make the local platform capable of running Airflow scheduler and webserver services
-- document how local execution and orchestrated execution fit together
+- add Prometheus-compatible metrics to the FastAPI inference service
+- track API-level request throughput, latency, and failures without pushing metric code into handlers
+- track ML-facing prediction volume, batch shape, output mix, and churn-probability distribution
+- add Prometheus and Grafana to the local platform with provisioned config and dashboards
+- document monitoring usage and operational expectations
 
 ## Repository Layout
 
@@ -21,6 +22,9 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 ├── artifacts/                # local training outputs (gitignored)
 ├── configs/
 │   └── base.yaml             # default training configuration
+├── monitoring/
+│   ├── grafana/              # provisioned dashboards and datasource config
+│   └── prometheus/           # local scrape configuration
 ├── docker/
 │   ├── airflow/              # Airflow image bootstrap assets
 │   └── entrypoint.sh         # runtime bootstrap for container services
@@ -38,6 +42,7 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 │       ├── models/           # estimator training and metrics
 │       ├── pipeline/         # runner orchestration and CLI entrypoint
 │       ├── inference/        # model loading and prediction service layer
+│       ├── monitoring/       # Prometheus metrics and request instrumentation
 │       ├── api/              # FastAPI app bootstrap, routes, and schemas
 │       ├── orchestration/    # stage-oriented training tasks and Airflow DAG builder
 │       └── tracking/         # tracker interface and MLflow implementation
@@ -169,6 +174,7 @@ The inference service loads the trained sklearn pipeline behind a dedicated serv
 Endpoints:
 
 - `GET /health`: liveness and readiness-style status for the API and model loader
+- `GET /metrics`: Prometheus scrape endpoint for API and inference metrics
 - `GET /v1/model/metadata`: loaded model source, feature contract, and class-label metadata
 - `POST /v1/predictions`: batch churn prediction endpoint
 
@@ -222,6 +228,31 @@ Example prediction request based on the shipped churn fixture:
 }
 ```
 
+## Monitoring And Observability
+
+The inference service exposes Prometheus metrics at `GET /metrics`. Metrics are collected outside the route handlers:
+
+- request-level metrics come from ASGI middleware
+- prediction and model-load metrics come from the inference service layer
+- the metrics endpoint itself is excluded from request counting so Prometheus scrapes do not distort traffic metrics
+
+The main metric groups are:
+
+- `churnops_api_http_requests_total`: request volume by method, route, and status code
+- `churnops_api_http_request_duration_seconds`: request latency histogram by method and route
+- `churnops_api_http_request_failures_total`: failed request count split into `client_error` and `server_error`
+- `churnops_inference_model_load_total`: model load attempts by source and result
+- `churnops_inference_prediction_requests_total`: successful prediction request volume by model source
+- `churnops_inference_prediction_records_total`: prediction record volume by predicted class and churn flag
+- `churnops_inference_prediction_batch_size`: batch size histogram for prediction calls
+- `churnops_inference_churn_probability`: histogram of positive-class probabilities for output-distribution visibility
+
+For a quick local check after the API is running:
+
+```bash
+curl -s http://localhost:8000/metrics | head
+```
+
 ## Containerized Local Platform
 
 The repository now includes a Docker image for the inference service and a `docker-compose.yml` stack for local platform workflows. Runtime behavior is driven through `CHURNOPS_*` environment variables so the same image can support local development, CI smoke tests, and later deployment targets.
@@ -238,6 +269,12 @@ Build and run the local inference service:
 make platform-up
 ```
 
+That command now starts:
+
+- `inference-api` on `http://localhost:8000`
+- `prometheus` on `http://localhost:9090`
+- `grafana` on `http://localhost:3000`
+
 Bootstrap or refresh the local model artifact from Docker:
 
 ```bash
@@ -253,6 +290,8 @@ make platform-down
 The compose stack includes:
 
 - `inference-api`: long-running FastAPI service for prediction traffic
+- `prometheus`: metrics scraper and time-series store for the local stack
+- `grafana`: dashboard UI with a provisioned Prometheus datasource and ChurnOps dashboard
 - `trainer`: one-shot training service under the `ops` profile
 - `mlflow`: MLflow UI under the `ops` profile for experiment inspection
 - `airflow-db`: PostgreSQL metadata database for Airflow
@@ -270,6 +309,8 @@ Useful environment variables:
 - `CHURNOPS_INFERENCE_REGISTERED_MODEL_NAME`, `CHURNOPS_INFERENCE_REGISTERED_MODEL_ALIAS`, `CHURNOPS_INFERENCE_REGISTERED_MODEL_VERSION`: MLflow registry model selection
 - `CHURNOPS_TRACKING_URI`, `CHURNOPS_REGISTRY_URI`, `CHURNOPS_TRACKING_ARTIFACT_LOCATION`: shared tracking backend configuration
 - `MLFLOW_UI_PORT`: host port for the MLflow UI service
+- `PROMETHEUS_PORT`: host port for the local Prometheus UI
+- `GRAFANA_PORT`, `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`: local Grafana access configuration
 - `CHURNOPS_ORCHESTRATION_WORKSPACE_DIR`: intermediate task handoff directory for orchestrated runs
 - `CHURNOPS_AIRFLOW_DAG_ID`, `CHURNOPS_AIRFLOW_SCHEDULE`, `CHURNOPS_AIRFLOW_CATCHUP`, `CHURNOPS_AIRFLOW_MAX_ACTIVE_RUNS`, `CHURNOPS_AIRFLOW_RETRIES`, `CHURNOPS_AIRFLOW_RETRY_DELAY_MINUTES`: orchestration schedule and retry controls
 - `AIRFLOW_WEBSERVER_PORT`, `AIRFLOW_ADMIN_*`, `AIRFLOW_UID`: local Airflow service configuration
@@ -289,6 +330,17 @@ make airflow-up
 ```
 
 With the default `.env.example`, the Airflow UI is available at `http://localhost:8080` and the DAG runs on the configured cron schedule of `0 3 * * 1`.
+
+Prometheus scrapes the API at `inference-api:8000/metrics`, and Grafana ships with a provisioned dashboard for:
+
+- request throughput by route
+- p95 latency
+- failure rate
+- prediction request rate
+- predicted output mix
+- churn-probability distribution
+
+The dashboard is loaded automatically at startup and set as the Grafana home dashboard.
 
 ## Continuous Integration
 
@@ -320,9 +372,11 @@ make test
 - the pipeline runner is orchestration-only; domain logic stays in dedicated validation, preprocessing, training, and evaluation modules.
 - experiment tracking is isolated under `churnops.tracking`, so the rest of the codebase stays MLflow-agnostic.
 - the inference API is thin by design; model loading and prediction execution live under `churnops.inference`.
+- observability is also kept separate; request instrumentation lives in middleware and ML metrics live in the inference service instead of route handlers.
 - environment-based runtime overrides keep the same image usable across local Docker workflows, CI, and future deployment targets.
 - orchestration state is externalized into a dedicated workspace so Airflow retries can resume from persisted stage outputs instead of recomputing everything blindly.
 - the DAG layer stays thin; reusable task wrappers keep orchestration concerns separate from model-training code.
 - the feature contract is explicit by default, which prevents accidental training on unexpected or leakage-prone columns.
 - the persisted model artifact is a full sklearn pipeline, which keeps future FastAPI inference integration straightforward.
 - the MLflow registry flow is metric-driven and can be repointed to a remote backend without changing pipeline orchestration.
+- the monitoring stack uses provisioned Prometheus and Grafana assets so local observability matches the repo-managed operational contract.

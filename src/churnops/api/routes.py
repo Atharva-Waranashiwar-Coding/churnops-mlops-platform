@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from churnops import __version__
 from churnops.api.dependencies import get_inference_service
 from churnops.api.schemas import (
     FeatureSchemaResponse,
@@ -26,7 +27,7 @@ def get_health(service: InferenceService = Depends(get_inference_service)) -> He
     health = service.get_health()
     return HealthResponse(
         service="churnops-inference-api",
-        version="0.1.0",
+        version=__version__,
         **health,
     )
 
