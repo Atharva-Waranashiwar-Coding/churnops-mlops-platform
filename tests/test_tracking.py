@@ -41,6 +41,13 @@ def test_run_local_training_logs_mlflow_run_and_registers_model(
     root_artifacts = {
         artifact.path for artifact in client.list_artifacts(result.tracking_result.run_id)
     }
+    metadata_artifacts = {
+        artifact.path
+        for artifact in client.list_artifacts(
+            result.tracking_result.run_id,
+            f"{settings.tracking.local_artifacts_path}/metadata",
+        )
+    }
     model_versions = client.search_model_versions(
         f"name = '{settings.tracking.model_registry.model_name}'"
     )
@@ -60,6 +67,10 @@ def test_run_local_training_logs_mlflow_run_and_registers_model(
         result.evaluation_result.metrics["validation"]["f1"]
     )
     assert settings.tracking.local_artifacts_path in root_artifacts
+    assert (
+        f"{settings.tracking.local_artifacts_path}/metadata/drift_baseline.json"
+        in metadata_artifacts
+    )
     assert len(model_versions) == 1
     assert model_versions[0].run_id == result.tracking_result.run_id
     assert model_versions[0].tags["churnops.registry.metric_name"] == "f1"
