@@ -12,6 +12,8 @@ from churnops.config.models import (
     AirflowConfig,
     ArtifactConfig,
     DatasetConfig,
+    DriftConfig,
+    DriftRetrainingConfig,
     InferenceConfig,
     ModelConfig,
     ModelRegistryConfig,
@@ -43,6 +45,7 @@ def load_settings(config_path: str | Path) -> Settings:
     artifacts_section = _as_mapping(raw_settings.get("artifacts", {}), "artifacts")
     tracking_section = _as_mapping(raw_settings.get("tracking", {}), "tracking")
     inference_section = _as_mapping(raw_settings.get("inference", {}), "inference")
+    drift_section = _as_mapping(raw_settings.get("drift", {}), "drift")
     orchestration_section = _as_mapping(raw_settings.get("orchestration", {}), "orchestration")
 
     project_root = Path(project_section.get("root_dir", "."))
@@ -196,6 +199,48 @@ def load_settings(config_path: str | Path) -> Settings:
         host=str(inference_section.get("host", "0.0.0.0")),
         port=int(inference_section.get("port", 8000)),
     )
+    retraining_section = _as_mapping(drift_section.get("retraining", {}), "drift.retraining")
+    drift = DriftConfig(
+        enabled=bool(drift_section.get("enabled", True)),
+        storage_dir=_resolve_path(
+            project.root_dir,
+            drift_section.get("storage_dir", "artifacts/monitoring/drift"),
+        ),
+        baseline_filename=str(drift_section.get("baseline_filename", "drift_baseline.json")),
+        window_size=int(drift_section.get("window_size", 200)),
+        min_samples=int(drift_section.get("min_samples", 100)),
+        numeric_bin_count=int(drift_section.get("numeric_bin_count", 10)),
+        categorical_top_k=int(drift_section.get("categorical_top_k", 10)),
+        psi_warning_threshold=float(drift_section.get("psi_warning_threshold", 0.1)),
+        psi_drift_threshold=float(drift_section.get("psi_drift_threshold", 0.25)),
+        min_drifted_features=int(drift_section.get("min_drifted_features", 2)),
+        retraining=DriftRetrainingConfig(
+            enabled=bool(retraining_section.get("enabled", False)),
+            backend=str(retraining_section.get("backend", "disabled")),
+            airflow_api_url=(
+                str(retraining_section["airflow_api_url"])
+                if retraining_section.get("airflow_api_url") is not None
+                else None
+            ),
+            dag_id=(
+                str(retraining_section["dag_id"])
+                if retraining_section.get("dag_id") is not None
+                else None
+            ),
+            username=(
+                str(retraining_section["username"])
+                if retraining_section.get("username") is not None
+                else None
+            ),
+            password=(
+                str(retraining_section["password"])
+                if retraining_section.get("password") is not None
+                else None
+            ),
+            cooldown_minutes=int(retraining_section.get("cooldown_minutes", 240)),
+            request_timeout_seconds=int(retraining_section.get("request_timeout_seconds", 10)),
+        ),
+    )
     airflow_section = _as_mapping(orchestration_section.get("airflow", {}), "orchestration.airflow")
     orchestration = OrchestrationConfig(
         workspace_dir=_resolve_path(
@@ -232,6 +277,7 @@ def load_settings(config_path: str | Path) -> Settings:
         artifacts=artifacts,
         tracking=tracking,
         inference=inference,
+        drift=drift,
         orchestration=orchestration,
         config_path=resolved_config_path,
     )

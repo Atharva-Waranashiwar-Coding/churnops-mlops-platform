@@ -14,6 +14,7 @@ from churnops.artifacts.persistence import PersistedRun, persist_training_run
 from churnops.config import Settings, load_runtime_settings
 from churnops.data.ingestion import read_raw_dataset
 from churnops.data.validation import DatasetValidationReport, validate_raw_dataset
+from churnops.drift import build_drift_baseline
 from churnops.features.preprocessing import (
     DataSplits,
     PreparedDataset,
@@ -114,11 +115,17 @@ def run_publication_stage(
 ) -> tuple[PersistedRun, TrackingResult]:
     """Persist artifacts and publish the completed training run to tracking backends."""
 
+    drift_baseline = build_drift_baseline(
+        feature_frame=data_splits.X_train,
+        feature_spec=prepared_dataset.feature_spec,
+        config=settings.drift,
+    )
     persisted_run = persist_training_run(
         settings=settings,
         trained_model=trained_model,
         evaluation_result=evaluation_result,
         validation_report=validation_report,
+        drift_baseline=drift_baseline,
     )
     tracker = build_training_tracker(settings)
     with tracker.start_run():
@@ -126,6 +133,7 @@ def run_publication_stage(
             CompletedTrainingRun(
                 settings=settings,
                 validation_report=validation_report,
+                drift_baseline=drift_baseline,
                 prepared_dataset=prepared_dataset,
                 data_splits=data_splits,
                 trained_model=trained_model,

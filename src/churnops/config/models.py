@@ -179,6 +179,87 @@ class InferenceConfig:
 
 
 @dataclass(slots=True)
+class DriftRetrainingConfig:
+    """Settings for triggering retraining when drift is detected."""
+
+    enabled: bool = False
+    backend: str = "disabled"
+    airflow_api_url: str | None = None
+    dag_id: str | None = None
+    username: str | None = None
+    password: str | None = None
+    cooldown_minutes: int = 240
+    request_timeout_seconds: int = 10
+
+    def __post_init__(self) -> None:
+        """Validate retraining trigger settings after deserialization."""
+
+        valid_backends = {"disabled", "airflow_api"}
+        if self.backend not in valid_backends:
+            raise ValueError(
+                "drift.retraining.backend must be one of: "
+                + ", ".join(sorted(valid_backends))
+                + "."
+            )
+        if self.enabled and self.backend == "airflow_api" and not self.airflow_api_url:
+            raise ValueError(
+                "drift.retraining.airflow_api_url must be set when the Airflow trigger is enabled."
+            )
+        if self.cooldown_minutes < 0:
+            raise ValueError("drift.retraining.cooldown_minutes must be zero or greater.")
+        if self.request_timeout_seconds < 1:
+            raise ValueError(
+                "drift.retraining.request_timeout_seconds must be at least 1 second."
+            )
+
+
+@dataclass(slots=True)
+class DriftConfig:
+    """Reference-baseline, drift detection, and retraining trigger settings."""
+
+    enabled: bool = True
+    storage_dir: Path = Path("artifacts/monitoring/drift")
+    baseline_filename: str = "drift_baseline.json"
+    window_size: int = 200
+    min_samples: int = 100
+    numeric_bin_count: int = 10
+    categorical_top_k: int = 10
+    psi_warning_threshold: float = 0.1
+    psi_drift_threshold: float = 0.25
+    min_drifted_features: int = 2
+    retraining: DriftRetrainingConfig = field(default_factory=DriftRetrainingConfig)
+
+    def __post_init__(self) -> None:
+        """Validate drift settings after deserialization."""
+
+        if not self.baseline_filename:
+            raise ValueError("drift.baseline_filename must not be empty.")
+        if self.window_size < 1:
+            raise ValueError("drift.window_size must be at least 1.")
+        if self.min_samples < 1:
+            raise ValueError("drift.min_samples must be at least 1.")
+        if self.window_size < self.min_samples:
+            raise ValueError(
+                "drift.window_size must be greater than or equal to drift.min_samples."
+            )
+        if self.numeric_bin_count < 1:
+            raise ValueError("drift.numeric_bin_count must be at least 1.")
+        if self.categorical_top_k < 1:
+            raise ValueError("drift.categorical_top_k must be at least 1.")
+        if self.psi_warning_threshold < 0:
+            raise ValueError("drift.psi_warning_threshold must be zero or greater.")
+        if self.psi_drift_threshold < 0:
+            raise ValueError("drift.psi_drift_threshold must be zero or greater.")
+        if self.psi_warning_threshold > self.psi_drift_threshold:
+            raise ValueError(
+                "drift.psi_warning_threshold must be less than or equal to "
+                "drift.psi_drift_threshold."
+            )
+        if self.min_drifted_features < 1:
+            raise ValueError("drift.min_drifted_features must be at least 1.")
+
+
+@dataclass(slots=True)
 class AirflowConfig:
     """Airflow DAG scheduling and retry settings."""
 
@@ -227,5 +308,6 @@ class Settings:
     artifacts: ArtifactConfig
     tracking: TrackingConfig
     inference: InferenceConfig
+    drift: DriftConfig
     orchestration: OrchestrationConfig
     config_path: Path

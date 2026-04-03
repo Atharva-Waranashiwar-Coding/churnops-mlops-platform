@@ -72,17 +72,20 @@ def test_run_training_persists_model_metrics_and_metadata(
     metrics_path = pipeline_result.persisted_run.metrics_path
     metadata_path = pipeline_result.persisted_run.metadata_path
     validation_report_path = pipeline_result.persisted_run.validation_report_path
+    drift_baseline_path = pipeline_result.persisted_run.drift_baseline_path
     config_snapshot_path = pipeline_result.persisted_run.config_snapshot_path
 
     assert model_path.exists()
     assert metrics_path.exists()
     assert metadata_path.exists()
     assert validation_report_path.exists()
+    assert drift_baseline_path.exists()
     assert config_snapshot_path.exists()
 
     metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     validation_report = json.loads(validation_report_path.read_text(encoding="utf-8"))
+    drift_baseline = json.loads(drift_baseline_path.read_text(encoding="utf-8"))
 
     assert set(metrics.keys()) == {"train", "validation", "test"}
     assert 0.0 <= metrics["test"]["accuracy"] <= 1.0
@@ -91,8 +94,12 @@ def test_run_training_persists_model_metrics_and_metadata(
     assert pipeline_result.evaluation_result.metrics["test"]["f1"] == metrics["test"]["f1"]
     assert pipeline_result.validation_report.row_count == 24
     assert metadata["artifacts"]["model_path"] == "model/model.joblib"
+    assert metadata["artifacts"]["drift_baseline_path"] == "metadata/drift_baseline.json"
     assert validation_report["row_count"] == 24
     assert validation_report["target_distribution"] == {"No": 12, "Yes": 12}
+    assert drift_baseline["source_split"] == "train"
+    assert drift_baseline["sample_size"] == 12
+    assert "tenure" in drift_baseline["features"]
     assert pipeline_result.tracking_result.enabled is False
 
     persisted_model = joblib.load(model_path)

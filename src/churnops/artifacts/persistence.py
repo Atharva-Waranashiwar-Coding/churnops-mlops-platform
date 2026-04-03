@@ -12,6 +12,7 @@ import joblib
 
 from churnops.config import Settings
 from churnops.data.validation import DatasetValidationReport
+from churnops.drift.models import DriftBaseline
 from churnops.models.evaluation import EvaluationResult
 from churnops.models.training import TrainedModel
 
@@ -26,6 +27,7 @@ class PersistedRun:
     metrics_path: Path
     metadata_path: Path
     validation_report_path: Path
+    drift_baseline_path: Path
     config_snapshot_path: Path
 
 
@@ -34,6 +36,7 @@ def persist_training_run(
     trained_model: TrainedModel,
     evaluation_result: EvaluationResult,
     validation_report: DatasetValidationReport,
+    drift_baseline: DriftBaseline,
 ) -> PersistedRun:
     """Persist the trained pipeline, metrics, and run metadata to disk."""
 
@@ -52,6 +55,9 @@ def persist_training_run(
         run_directory
         / settings.artifacts.metadata_directory
         / settings.artifacts.validation_report_filename
+    )
+    drift_baseline_path = (
+        run_directory / settings.artifacts.metadata_directory / settings.drift.baseline_filename
     )
     config_snapshot_path = (
         run_directory
@@ -76,6 +82,9 @@ def persist_training_run(
     with validation_report_path.open("w", encoding="utf-8") as validation_file:
         json.dump(asdict(validation_report), validation_file, indent=2, sort_keys=True)
 
+    with drift_baseline_path.open("w", encoding="utf-8") as drift_baseline_file:
+        json.dump(drift_baseline.to_payload(), drift_baseline_file, indent=2, sort_keys=True)
+
     metadata = {
         "run_id": run_id,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -87,6 +96,7 @@ def persist_training_run(
             "metrics_path": str(metrics_path.relative_to(run_directory)),
             "metadata_path": str(metadata_path.relative_to(run_directory)),
             "validation_report_path": str(validation_report_path.relative_to(run_directory)),
+            "drift_baseline_path": str(drift_baseline_path.relative_to(run_directory)),
             "config_snapshot_path": str(config_snapshot_path.relative_to(run_directory)),
         },
         "data": {
@@ -105,6 +115,12 @@ def persist_training_run(
             "name": settings.model.name,
             "params": settings.model.params,
         },
+        "drift": {
+            "enabled": settings.drift.enabled,
+            "baseline_filename": settings.drift.baseline_filename,
+            "sample_size": drift_baseline.sample_size,
+            "feature_count": drift_baseline.feature_count,
+        },
     }
     with metadata_path.open("w", encoding="utf-8") as metadata_file:
         json.dump(metadata, metadata_file, indent=2, sort_keys=True)
@@ -117,5 +133,6 @@ def persist_training_run(
         metrics_path=metrics_path,
         metadata_path=metadata_path,
         validation_report_path=validation_report_path,
+        drift_baseline_path=drift_baseline_path,
         config_snapshot_path=config_snapshot_path,
     )
