@@ -11,13 +11,15 @@ from churnops.config import Settings
 from churnops.inference.exceptions import ModelLoadError, PredictionError
 from churnops.inference.loader import load_inference_model
 from churnops.inference.models import LoadedModel, PredictionRecord
+from churnops.monitoring.metrics import InferenceMetrics
 
 
 class InferenceService:
     """Load and query the configured churn inference model."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, metrics: InferenceMetrics | None = None) -> None:
         self._settings = settings
+        self._metrics = metrics
         self._loaded_model: LoadedModel | None = None
         self._last_error: str | None = None
         self._lock = Lock()
@@ -39,12 +41,22 @@ class InferenceService:
                 loaded_model = load_inference_model(self._settings)
             except Exception as error:
                 self._last_error = str(error)
+                if self._metrics is not None:
+                    self._metrics.record_model_load(
+                        model_source=self._settings.inference.model_source,
+                        result="failure",
+                    )
                 if isinstance(error, ModelLoadError):
                     raise
                 raise ModelLoadError(str(error)) from error
 
             self._loaded_model = loaded_model
             self._last_error = None
+            if self._metrics is not None:
+                self._metrics.record_model_load(
+                    model_source=loaded_model.descriptor.source_type,
+                    result="success",
+                )
             return loaded_model
 
     def predict(self, records: list[dict[str, Any]]) -> tuple[LoadedModel, list[PredictionRecord]]:
@@ -73,6 +85,11 @@ class InferenceService:
             )
             for index, predicted_class in enumerate(predictions)
         ]
+        if self._metrics is not None:
+            self._metrics.record_prediction_batch(
+                model_source=loaded_model.descriptor.source_type,
+                predictions=prediction_records,
+            )
         return loaded_model, prediction_records
 
     def get_model_metadata(self) -> LoadedModel:
