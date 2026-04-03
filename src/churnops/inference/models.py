@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 
@@ -24,6 +25,7 @@ class ModelDescriptor:
     training_run_id: str | None = None
     registered_model_name: str | None = None
     registered_model_version: str | None = None
+    local_run_directory: Path | None = None
 
 
 @dataclass(slots=True)

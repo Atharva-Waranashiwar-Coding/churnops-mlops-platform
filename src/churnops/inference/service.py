@@ -2,24 +2,34 @@
 
 from __future__ import annotations
 
+import logging
 from threading import Lock
 from typing import Any
 
 import pandas as pd
 
 from churnops.config import Settings
+from churnops.drift import DriftMonitor
 from churnops.inference.exceptions import ModelLoadError, PredictionError
 from churnops.inference.loader import load_inference_model
 from churnops.inference.models import LoadedModel, PredictionRecord
 from churnops.monitoring.metrics import InferenceMetrics
 
+LOGGER = logging.getLogger(__name__)
+
 
 class InferenceService:
     """Load and query the configured churn inference model."""
 
-    def __init__(self, settings: Settings, metrics: InferenceMetrics | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        metrics: InferenceMetrics | None = None,
+        drift_monitor: DriftMonitor | None = None,
+    ) -> None:
         self._settings = settings
         self._metrics = metrics
+        self._drift_monitor = drift_monitor or DriftMonitor(settings)
         self._loaded_model: LoadedModel | None = None
         self._last_error: str | None = None
         self._lock = Lock()
@@ -90,6 +100,7 @@ class InferenceService:
                 model_source=loaded_model.descriptor.source_type,
                 predictions=prediction_records,
             )
+        self._record_drift_observation(feature_frame, loaded_model)
         return loaded_model, prediction_records
 
     def get_model_metadata(self) -> LoadedModel:
@@ -108,6 +119,18 @@ class InferenceService:
             "model_source": self._settings.inference.model_source,
             "last_error": self._last_error,
         }
+
+    def _record_drift_observation(
+        self,
+        feature_frame: pd.DataFrame,
+        loaded_model: LoadedModel,
+    ) -> None:
+        """Pass successful inference inputs into the drift monitor without blocking predictions."""
+
+        try:
+            self._drift_monitor.observe(feature_frame, loaded_model)
+        except Exception:
+            LOGGER.exception("Drift monitoring failed for an inference batch.")
 
     def _build_feature_frame(
         self,
