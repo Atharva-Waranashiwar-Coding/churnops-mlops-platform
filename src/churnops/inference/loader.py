@@ -53,6 +53,7 @@ def _load_from_local_artifact(settings: Settings) -> LoadedModel:
         descriptor=_build_local_descriptor(
             settings=settings,
             model_path=model_path,
+            run_directory=run_directory,
             run_metadata=run_metadata,
             validation_report=validation_report,
         ),
@@ -173,6 +174,7 @@ def _infer_run_directory_from_model_path(settings: Settings, model_path: Path) -
 def _build_local_descriptor(
     settings: Settings,
     model_path: Path,
+    run_directory: Path | None,
     run_metadata: dict[str, Any] | None,
     validation_report: dict[str, Any] | None,
 ) -> ModelDescriptor:
@@ -194,6 +196,7 @@ def _build_local_descriptor(
         numeric_features=numeric_features,
         categorical_features=categorical_features,
         training_run_id=str(run_metadata.get("run_id")) if run_metadata is not None else None,
+        local_run_directory=run_directory,
     )
 
 

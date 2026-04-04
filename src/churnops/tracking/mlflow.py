@@ -150,6 +150,15 @@ class MLflowTrainingTracker:
             "split.validation_size": str(completed_run.settings.split.validation_size),
             "split.random_state": str(completed_run.settings.split.random_state),
             "model.name": completed_run.settings.model.name,
+            "drift.enabled": str(completed_run.settings.drift.enabled),
+            "drift.window_size": str(completed_run.settings.drift.window_size),
+            "drift.min_samples": str(completed_run.settings.drift.min_samples),
+            "drift.psi_warning_threshold": str(
+                completed_run.settings.drift.psi_warning_threshold
+            ),
+            "drift.psi_drift_threshold": str(
+                completed_run.settings.drift.psi_drift_threshold
+            ),
         }
         if "validation" in completed_run.evaluation_result.split_sizes:
             params["split.validation_rows"] = str(

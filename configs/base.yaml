@@ -142,6 +142,24 @@ inference:
   host: 0.0.0.0
   port: 8000
 
+drift:
+  enabled: true
+  storage_dir: artifacts/monitoring/drift
+  baseline_filename: drift_baseline.json
+  window_size: 200
+  min_samples: 100
+  numeric_bin_count: 10
+  categorical_top_k: 10
+  psi_warning_threshold: 0.1
+  psi_drift_threshold: 0.25
+  min_drifted_features: 2
+  retraining:
+    enabled: false
+    backend: disabled
+    dag_id: churnops_training_pipeline
+    cooldown_minutes: 240
+    request_timeout_seconds: 10
+
 orchestration:
   workspace_dir: artifacts/orchestration
   airflow:

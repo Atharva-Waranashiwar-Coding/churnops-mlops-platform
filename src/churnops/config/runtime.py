@@ -126,6 +126,120 @@ def apply_runtime_overrides(
             inference=replace(overridden_settings.inference, **inference_updates),
         )
 
+    drift_updates: dict[str, object] = {}
+
+    drift_enabled = _read_environment_value(environment, "CHURNOPS_DRIFT_ENABLED")
+    if drift_enabled is not _UNSET and drift_enabled:
+        drift_updates["enabled"] = _parse_bool(drift_enabled)
+
+    drift_storage_dir = _read_environment_value(environment, "CHURNOPS_DRIFT_STORAGE_DIR")
+    if drift_storage_dir is not _UNSET and drift_storage_dir:
+        drift_updates["storage_dir"] = _resolve_path(overridden_settings, drift_storage_dir)
+
+    drift_window_size = _read_environment_value(environment, "CHURNOPS_DRIFT_WINDOW_SIZE")
+    if drift_window_size is not _UNSET and drift_window_size:
+        drift_updates["window_size"] = int(drift_window_size)
+
+    drift_min_samples = _read_environment_value(environment, "CHURNOPS_DRIFT_MIN_SAMPLES")
+    if drift_min_samples is not _UNSET and drift_min_samples:
+        drift_updates["min_samples"] = int(drift_min_samples)
+
+    drift_numeric_bin_count = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_NUMERIC_BIN_COUNT",
+    )
+    if drift_numeric_bin_count is not _UNSET and drift_numeric_bin_count:
+        drift_updates["numeric_bin_count"] = int(drift_numeric_bin_count)
+
+    drift_categorical_top_k = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_CATEGORICAL_TOP_K",
+    )
+    if drift_categorical_top_k is not _UNSET and drift_categorical_top_k:
+        drift_updates["categorical_top_k"] = int(drift_categorical_top_k)
+
+    drift_warning_threshold = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_PSI_WARNING_THRESHOLD",
+    )
+    if drift_warning_threshold is not _UNSET and drift_warning_threshold:
+        drift_updates["psi_warning_threshold"] = float(drift_warning_threshold)
+
+    drift_threshold = _read_environment_value(environment, "CHURNOPS_DRIFT_PSI_DRIFT_THRESHOLD")
+    if drift_threshold is not _UNSET and drift_threshold:
+        drift_updates["psi_drift_threshold"] = float(drift_threshold)
+
+    drift_min_drifted_features = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_MIN_DRIFTED_FEATURES",
+    )
+    if drift_min_drifted_features is not _UNSET and drift_min_drifted_features:
+        drift_updates["min_drifted_features"] = int(drift_min_drifted_features)
+
+    retraining_updates: dict[str, object] = {}
+
+    retraining_enabled = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_RETRAINING_ENABLED",
+    )
+    if retraining_enabled is not _UNSET and retraining_enabled:
+        retraining_updates["enabled"] = _parse_bool(retraining_enabled)
+
+    retraining_backend = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_RETRAINING_BACKEND",
+    )
+    if retraining_backend is not _UNSET and retraining_backend:
+        retraining_updates["backend"] = retraining_backend
+
+    airflow_api_url = _read_environment_value(environment, "CHURNOPS_DRIFT_AIRFLOW_API_URL")
+    if airflow_api_url is not _UNSET:
+        retraining_updates["airflow_api_url"] = airflow_api_url or None
+
+    retraining_dag_id = _read_environment_value(environment, "CHURNOPS_DRIFT_AIRFLOW_DAG_ID")
+    if retraining_dag_id is not _UNSET:
+        retraining_updates["dag_id"] = retraining_dag_id or None
+
+    retraining_username = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_AIRFLOW_USERNAME",
+    )
+    if retraining_username is not _UNSET:
+        retraining_updates["username"] = retraining_username or None
+
+    retraining_password = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_AIRFLOW_PASSWORD",
+    )
+    if retraining_password is not _UNSET:
+        retraining_updates["password"] = retraining_password or None
+
+    retraining_cooldown = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_RETRAINING_COOLDOWN_MINUTES",
+    )
+    if retraining_cooldown is not _UNSET and retraining_cooldown:
+        retraining_updates["cooldown_minutes"] = int(retraining_cooldown)
+
+    retraining_timeout = _read_environment_value(
+        environment,
+        "CHURNOPS_DRIFT_RETRAINING_REQUEST_TIMEOUT_SECONDS",
+    )
+    if retraining_timeout is not _UNSET and retraining_timeout:
+        retraining_updates["request_timeout_seconds"] = int(retraining_timeout)
+
+    if retraining_updates:
+        drift_updates["retraining"] = replace(
+            overridden_settings.drift.retraining,
+            **retraining_updates,
+        )
+
+    if drift_updates:
+        overridden_settings = replace(
+            overridden_settings,
+            drift=replace(overridden_settings.drift, **drift_updates),
+        )
+
     orchestration_updates: dict[str, object] = {}
 
     workspace_dir = _read_environment_value(environment, "CHURNOPS_ORCHESTRATION_WORKSPACE_DIR")
@@ -199,6 +313,7 @@ def ensure_runtime_directories(settings: Settings) -> None:
         exist_ok=True,
     )
     settings.data.raw_data_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.drift.storage_dir.mkdir(parents=True, exist_ok=True)
     settings.orchestration.workspace_dir.mkdir(parents=True, exist_ok=True)
 
     tracking_store_path = _local_path_from_uri(settings.tracking.tracking_uri)

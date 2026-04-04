@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from churnops.artifacts.persistence import PersistedRun
 from churnops.config import Settings
 from churnops.data.validation import DatasetValidationReport
+from churnops.drift.models import DriftBaseline
 from churnops.features.preprocessing import DataSplits, PreparedDataset
 from churnops.models.evaluation import EvaluationResult
 from churnops.models.training import TrainedModel
@@ -18,6 +19,7 @@ class CompletedTrainingRun:
 
     settings: Settings
     validation_report: DatasetValidationReport
+    drift_baseline: DriftBaseline
     prepared_dataset: PreparedDataset
     data_splits: DataSplits
     trained_model: TrainedModel
