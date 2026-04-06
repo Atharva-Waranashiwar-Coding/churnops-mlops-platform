@@ -2,6 +2,8 @@
 
 ChurnOps is structured as a small but end-to-end MLOps system. The codebase keeps business logic separate from orchestration, tracking, serving, and deployment concerns so each layer can evolve without rewriting the rest of the stack.
 
+For local setup, running, and testing commands, use [README.md](../README.md).
+
 ## System Overview
 
 ```mermaid
@@ -75,6 +77,17 @@ Those surfaces all share the same runtime contract:
 - `CHURNOPS_*` environment variables override runtime behavior without code changes
 - the inference image is the common deployment artifact across Docker and Kubernetes
 - the API exposes `/health`, `/health/live`, `/health/ready`, and `/metrics` consistently
+
+The main local commands are:
+
+- `make train-fixture`
+- `make serve`
+- `make test`
+- `make verify`
+- `make platform-up`
+- `make airflow-up`
+- `make k8s-render-staging`
+- `make k8s-render-production`
 
 ## Repository Boundaries
 
