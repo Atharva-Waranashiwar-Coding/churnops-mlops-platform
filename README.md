@@ -1,16 +1,57 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 10 adds a Kubernetes deployment path for the inference service so the existing container, runtime config, metrics, and drift-aware inference behavior can move into a cluster without rewriting the service.
+ChurnOps is an end-to-end MLOps portfolio repository for customer churn prediction. It covers the full lifecycle from training and experiment tracking through inference serving, observability, drift detection, retraining orchestration, and Kubernetes deployment.
 
-## Phase 10 Scope
+## Documentation
 
-- keep the current training, tracking, inference, and containerization layers intact
-- add Kubernetes manifests for the inference service using the existing image and runtime contract
-- support environment-specific runtime configuration through cluster resources rather than image rebuilds
-- keep deployment assets structured so the base workload and overlays stay readable
-- prepare monitoring integration for Prometheus scraping and operator-based clusters
-- tighten runtime readiness semantics for cluster probes and rollouts
-- document how to render, apply, and validate the Kubernetes deployment
+- [Architecture](docs/architecture.md)
+- [Contributing](CONTRIBUTING.md)
+- [Release Notes](docs/release-notes/v0.1.0.md)
+- [Changelog](CHANGELOG.md)
+
+## Highlights
+
+- modular churn-model training pipeline with reusable stage boundaries
+- MLflow experiment tracking and best-model registration flow
+- FastAPI inference service with strong request/response schemas and probe endpoints
+- Prometheus and Grafana observability for API and ML-facing metrics
+- drift-aware monitoring with PSI-based detection and Airflow-triggered retraining
+- Docker Compose local platform and Kubernetes deployment assets
+
+## Quick Start
+
+Install the project:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+make install-dev
+```
+
+Run a full local verification pass:
+
+```bash
+make verify
+```
+
+Train against the checked-in fixture dataset:
+
+```bash
+make train-fixture
+```
+
+Start the API locally:
+
+```bash
+make serve
+```
+
+Start the local platform stack:
+
+```bash
+cp .env.example .env
+make platform-up
+```
 
 ## Repository Layout
 
