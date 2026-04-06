@@ -198,11 +198,12 @@ services:
   airflow-init:
     <<: *airflow-common
     restart: "no"
-    command: ["/opt/churnops/docker/airflow/init.sh"]
+    entrypoint: ["/bin/sh", "/opt/churnops/docker/airflow/init.sh"]
+    command: []
 
   airflow-scheduler:
     <<: *airflow-common
-    command: ["airflow", "scheduler"]
+    command: ["scheduler"]
     depends_on:
       airflow-db:
         condition: service_healthy
@@ -211,7 +212,7 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    command: ["airflow", "webserver"]
+    command: ["webserver"]
     ports:
       - "${AIRFLOW_WEBSERVER_PORT:-8080}:8080"
     depends_on:
