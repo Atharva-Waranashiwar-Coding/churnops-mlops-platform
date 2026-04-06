@@ -42,6 +42,72 @@ def test_health_endpoint_reports_ready_after_model_preload(
     assert liveness_response.json()["status"] == "ok"
 
 
+def test_health_endpoint_generates_request_id_when_missing(
+    dataset_config,
+    churn_fixture_path,
+    tmp_path,
+) -> None:
+    """The API should attach a generated request ID to responses."""
+
+    config_path = _write_inference_config(
+        tmp_path=tmp_path,
+        churn_fixture_path=churn_fixture_path,
+        dataset_config=dataset_config,
+    )
+    run_training(config_path)
+
+    with TestClient(create_app(config_path)) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert len(response.headers["x-request-id"]) >= 16
+
+
+def test_health_endpoint_preserves_incoming_request_id(
+    dataset_config,
+    churn_fixture_path,
+    tmp_path,
+) -> None:
+    """The API should echo a caller-supplied request ID."""
+
+    config_path = _write_inference_config(
+        tmp_path=tmp_path,
+        churn_fixture_path=churn_fixture_path,
+        dataset_config=dataset_config,
+    )
+    run_training(config_path)
+
+    with TestClient(create_app(config_path)) as client:
+        response = client.get("/health", headers={"X-Request-ID": "demo-request-123"})
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "demo-request-123"
+
+
+def test_readiness_endpoint_is_ok_when_preload_is_disabled(
+    dataset_config,
+    churn_fixture_path,
+    tmp_path,
+) -> None:
+    """Readiness should stay green when lazy loading is an intentional runtime choice."""
+
+    config_path = _write_inference_config(
+        tmp_path=tmp_path,
+        churn_fixture_path=churn_fixture_path,
+        dataset_config=dataset_config,
+        inference_override={"preload_model": False},
+    )
+    run_training(config_path)
+
+    with TestClient(create_app(config_path)) as client:
+        readiness_response = client.get("/health/ready")
+
+    payload = readiness_response.json()
+    assert readiness_response.status_code == 200
+    assert payload["status"] == "ok"
+    assert payload["model_loaded"] is False
+
+
 def test_model_metadata_endpoint_returns_feature_contract(
     dataset_config,
     churn_fixture_path,
