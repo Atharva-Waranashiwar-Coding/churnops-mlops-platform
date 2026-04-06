@@ -47,7 +47,7 @@ platform-train: ## Run the trainer container once against the configured dataset
 	docker compose run --rm --profile ops trainer
 
 airflow-init: ## Bootstrap the local Airflow metadata database and admin account
-	docker compose --profile ops up airflow-db airflow-init
+	docker compose --profile ops up --abort-on-container-exit --exit-code-from airflow-init airflow-db airflow-init
 
 airflow-up: ## Start the local Airflow scheduler and webserver
 	docker compose --profile ops up --build airflow-db airflow-scheduler airflow-webserver
