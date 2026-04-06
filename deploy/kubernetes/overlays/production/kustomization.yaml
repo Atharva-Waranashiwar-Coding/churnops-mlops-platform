@@ -5,6 +5,7 @@ namespace: churnops-production
 
 resources:
   - ../../base
+  - ../../addons/monitoring-operator
   - namespace.yaml
 
 generatorOptions:
