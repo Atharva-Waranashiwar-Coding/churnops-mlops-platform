@@ -4,6 +4,7 @@
 	package platform-down platform-train platform-up serve test train train-fixture verify
 
 CONFIG ?= configs/base.yaml
+FIXTURE_CONFIG ?= configs/fixture.yaml
 DATA_PATH ?=
 K8S_OVERLAY ?= deploy/kubernetes/overlays/staging
 FIXTURE_DATA ?= tests/fixtures/customer_churn.csv
@@ -34,7 +35,7 @@ train: ## Run the local training workflow
 	PYTHONPATH=src python -m churnops.pipeline.train --config $(CONFIG) $(if $(DATA_PATH),--data-path $(DATA_PATH))
 
 train-fixture: ## Train against the checked-in churn fixture dataset
-	PYTHONPATH=src python -m churnops.pipeline.train --config $(CONFIG) --data-path $(FIXTURE_DATA)
+	PYTHONPATH=src python -m churnops.pipeline.train --config $(FIXTURE_CONFIG) --data-path $(FIXTURE_DATA)
 
 serve: ## Start the FastAPI inference service locally
 	PYTHONPATH=src python -m churnops.api.app --config $(CONFIG)

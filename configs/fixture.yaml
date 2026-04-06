@@ -1,0 +1,145 @@
+project:
+  name: churnops
+  root_dir: ..
+
+data:
+  raw_data_path: tests/fixtures/customer_churn.csv
+  target_column: Churn
+  positive_class: "Yes"
+  column_renames: {}
+  id_columns:
+    - customerID
+  drop_columns: []
+  required_columns:
+    - customerID
+    - gender
+    - SeniorCitizen
+    - Partner
+    - Dependents
+    - tenure
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+    - MonthlyCharges
+    - TotalCharges
+    - Churn
+  numeric_features:
+    - tenure
+    - MonthlyCharges
+    - TotalCharges
+  categorical_features:
+    - gender
+    - SeniorCitizen
+    - Partner
+    - Dependents
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+  numeric_coercion_columns:
+    - TotalCharges
+  na_values:
+    - ""
+    - " "
+  infer_remaining_features: false
+
+split:
+  test_size: 0.2
+  validation_size: 0.1
+  random_state: 42
+
+model:
+  name: logistic_regression
+  params:
+    C: 1.0
+    class_weight: balanced
+    max_iter: 1000
+    solver: lbfgs
+
+artifacts:
+  root_dir: artifacts
+  training_runs_dir: training
+  model_directory: model
+  model_filename: model.joblib
+  metrics_directory: metrics
+  metrics_filename: metrics.json
+  metadata_directory: metadata
+  metadata_filename: run.json
+  validation_report_filename: validation.json
+  config_directory: config
+  config_snapshot_filename: training.yaml
+
+tracking:
+  enabled: true
+  experiment_name: churnops-local-training
+  tracking_uri: sqlite:///artifacts/mlflow/mlflow.db
+  registry_uri: sqlite:///artifacts/mlflow/mlflow.db
+  artifact_location: artifacts/mlflow/artifacts
+  run_name_prefix: churnops-local
+  model_artifact_path: model
+  local_artifacts_path: local_run
+  tags:
+    environment: local
+    workflow: training
+  model_registry:
+    enabled: true
+    model_name: churnops-churn-classifier
+    comparison_metric: f1
+    comparison_split: validation
+    greater_is_better: true
+
+inference:
+  model_source: local_artifact
+  prediction_threshold: 0.5
+  preload_model: true
+  host: 0.0.0.0
+  port: 8000
+
+drift:
+  enabled: true
+  storage_dir: artifacts/monitoring/drift
+  baseline_filename: drift_baseline.json
+  window_size: 200
+  min_samples: 100
+  numeric_bin_count: 10
+  categorical_top_k: 10
+  psi_warning_threshold: 0.1
+  psi_drift_threshold: 0.25
+  min_drifted_features: 2
+  retraining:
+    enabled: false
+    backend: disabled
+    dag_id: churnops_training_pipeline
+    cooldown_minutes: 240
+    request_timeout_seconds: 10
+
+orchestration:
+  workspace_dir: artifacts/orchestration
+  airflow:
+    dag_id: churnops_training_pipeline
+    schedule: "0 3 * * 1"
+    start_date: "2024-01-01T00:00:00+00:00"
+    catchup: false
+    max_active_runs: 1
+    retries: 1
+    retry_delay_minutes: 5
+    tags:
+      - churnops
+      - retraining
