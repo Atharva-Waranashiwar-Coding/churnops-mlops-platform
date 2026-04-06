@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -9,6 +11,35 @@ import yaml
 
 from churnops.api import app as api_app_module
 from churnops.pipeline import train as train_module
+
+
+def test_entrypoint_modules_import_cleanly_in_fresh_python_process() -> None:
+    """Fresh Python processes should import the CLI entrypoints without circular imports."""
+
+    repo_root = Path(__file__).resolve().parents[1]
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH")
+    source_path = str(repo_root / "src")
+    env["PYTHONPATH"] = (
+        source_path
+        if not existing_pythonpath
+        else f"{source_path}{os.pathsep}{existing_pythonpath}"
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import churnops.pipeline.train; import churnops.api.app",
+        ],
+        capture_output=True,
+        check=False,
+        cwd=repo_root,
+        env=env,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 def test_training_main_returns_zero_for_fixture_dataset(
