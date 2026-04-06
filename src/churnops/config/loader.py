@@ -108,7 +108,7 @@ def load_settings(config_path: str | Path) -> Settings:
         ),
         config_directory=str(artifacts_section.get("config_directory", "config")),
         config_snapshot_filename=str(
-            artifacts_section.get("config_snapshot_filename", "config.yaml")
+            artifacts_section.get("config_snapshot_filename", "training.yaml")
         ),
     )
     model_registry_section = _as_mapping(
