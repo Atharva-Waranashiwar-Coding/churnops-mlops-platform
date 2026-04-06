@@ -14,6 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from churnops import __version__
+from churnops.api.middleware import RequestContextMiddleware
 from churnops.api.routes import router
 from churnops.config import Settings, get_default_config_path, load_runtime_settings
 from churnops.inference import InferenceService
@@ -41,6 +42,16 @@ def create_app(
         service = InferenceService(resolved_settings, metrics=metrics)
         app.state.settings = resolved_settings
         app.state.inference_service = service
+        LOGGER.info(
+            "Starting inference service | version=%s config=%s model_source=%s preload_model=%s "
+            "tracking_enabled=%s drift_enabled=%s",
+            __version__,
+            resolved_settings.config_path,
+            resolved_settings.inference.model_source,
+            resolved_settings.inference.preload_model,
+            resolved_settings.tracking.enabled,
+            resolved_settings.drift.enabled,
+        )
         if resolved_settings.inference.preload_model:
             try:
                 service.preload_model()
@@ -55,6 +66,7 @@ def create_app(
     )
     app.state.metrics = metrics
     app.add_middleware(RequestMetricsMiddleware, metrics=metrics)
+    app.add_middleware(RequestContextMiddleware)
     app.mount("/metrics", build_metrics_asgi_app(metrics.registry))
     _register_exception_handlers(app)
     app.include_router(router)
@@ -79,18 +91,40 @@ def main() -> int:
     parser = build_argument_parser()
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    from churnops.runtime_logging import configure_logging
+
+    configure_logging("churnops-inference-api")
+
+    try:
+        settings = load_runtime_settings(args.config)
+    except FileNotFoundError as error:
+        LOGGER.error("%s. Provide a valid config path with --config.", error)
+        return 1
+    except Exception:
+        LOGGER.exception("Unable to load inference runtime settings.")
+        return 1
+
+    LOGGER.info(
+        "Serving inference API | host=%s port=%s model_source=%s preload_model=%s config=%s",
+        settings.inference.host,
+        settings.inference.port,
+        settings.inference.model_source,
+        settings.inference.preload_model,
+        settings.config_path,
     )
 
-    settings = load_runtime_settings(args.config)
-    uvicorn.run(
-        create_app(settings=settings),
-        host=settings.inference.host,
-        port=settings.inference.port,
-        log_level="info",
-    )
+    try:
+        uvicorn.run(
+            create_app(settings=settings),
+            host=settings.inference.host,
+            port=settings.inference.port,
+            log_level="info",
+            access_log=False,
+            log_config=None,
+        )
+    except Exception:
+        LOGGER.exception("Inference API terminated unexpectedly.")
+        return 1
     return 0
 
 

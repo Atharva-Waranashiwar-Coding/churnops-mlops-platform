@@ -47,6 +47,10 @@ class InferenceService:
             if self._loaded_model is not None and not force_reload:
                 return self._loaded_model
 
+            LOGGER.info(
+                "Loading inference model | source=%s",
+                self._settings.inference.model_source,
+            )
             try:
                 loaded_model = load_inference_model(self._settings)
             except Exception as error:
@@ -62,6 +66,12 @@ class InferenceService:
 
             self._loaded_model = loaded_model
             self._last_error = None
+            LOGGER.info(
+                "Inference model loaded | model_name=%s source_type=%s training_run_id=%s",
+                loaded_model.descriptor.model_name,
+                loaded_model.descriptor.source_type,
+                loaded_model.descriptor.training_run_id or "n/a",
+            )
             if self._metrics is not None:
                 self._metrics.record_model_load(
                     model_source=loaded_model.descriptor.source_type,

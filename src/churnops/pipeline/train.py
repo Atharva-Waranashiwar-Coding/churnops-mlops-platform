@@ -8,6 +8,7 @@ from pathlib import Path
 
 from churnops.config import get_default_config_path, load_runtime_settings
 from churnops.pipeline.runner import TrainingPipelineResult, run_local_training
+from churnops.runtime_logging import configure_logging as configure_runtime_logging
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,10 +42,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
 def configure_logging() -> None:
     """Configure application logging for CLI execution."""
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    )
+    configure_runtime_logging("churnops-training")
 
 
 def main() -> int:
@@ -54,6 +52,11 @@ def main() -> int:
     args = parser.parse_args()
 
     configure_logging()
+    LOGGER.info(
+        "Starting training workflow | config=%s data_path_override=%s",
+        args.config,
+        args.data_path or "none",
+    )
 
     try:
         pipeline_result = run_training(args.config, data_path=args.data_path)
