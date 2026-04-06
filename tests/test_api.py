@@ -28,12 +28,18 @@ def test_health_endpoint_reports_ready_after_model_preload(
 
     with TestClient(create_app(config_path)) as client:
         response = client.get("/health")
+        readiness_response = client.get("/health/ready")
+        liveness_response = client.get("/health/live")
 
     payload = response.json()
     assert response.status_code == 200
     assert payload["status"] == "ok"
     assert payload["model_loaded"] is True
     assert payload["model_source"] == "local_artifact"
+    assert readiness_response.status_code == 200
+    assert readiness_response.json()["status"] == "ok"
+    assert liveness_response.status_code == 200
+    assert liveness_response.json()["status"] == "ok"
 
 
 def test_model_metadata_endpoint_returns_feature_contract(
@@ -134,6 +140,8 @@ def test_prediction_endpoint_returns_503_when_model_is_missing(
 
     with TestClient(create_app(config_path)) as client:
         health_response = client.get("/health")
+        readiness_response = client.get("/health/ready")
+        liveness_response = client.get("/health/live")
         prediction_response = client.post(
             "/v1/predictions",
             json={"instances": _build_prediction_payload(churn_fixture_path, row_count=1)},
@@ -143,6 +151,10 @@ def test_prediction_endpoint_returns_503_when_model_is_missing(
     assert health_response.status_code == 200
     assert health_payload["status"] == "degraded"
     assert health_payload["model_loaded"] is False
+    assert readiness_response.status_code == 503
+    assert readiness_response.json()["status"] == "degraded"
+    assert liveness_response.status_code == 200
+    assert liveness_response.json()["status"] == "ok"
     assert prediction_response.status_code == 503
 
 

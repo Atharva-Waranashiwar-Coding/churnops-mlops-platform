@@ -103,6 +103,14 @@ class HealthResponse(BaseModel):
     last_error: str | None = None
 
 
+class ProbeResponse(BaseModel):
+    """Minimal response for liveness-style health probes."""
+
+    status: Literal["ok"]
+    service: str
+    version: str
+
+
 class FeatureSchemaResponse(BaseModel):
     """Feature groups expected by the current model."""
 

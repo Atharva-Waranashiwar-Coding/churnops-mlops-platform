@@ -120,6 +120,13 @@ class InferenceService:
             "last_error": self._last_error,
         }
 
+    def is_ready(self) -> bool:
+        """Return whether the service is ready to receive traffic."""
+
+        if self._loaded_model is not None:
+            return True
+        return not self._settings.inference.preload_model and self._last_error is None
+
     def _record_drift_observation(
         self,
         feature_frame: pd.DataFrame,

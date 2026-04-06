@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from churnops import __version__
 from churnops.api.dependencies import get_inference_service
@@ -14,6 +14,7 @@ from churnops.api.schemas import (
     PredictionRequest,
     PredictionResponse,
     PredictionResultResponse,
+    ProbeResponse,
 )
 from churnops.inference import InferenceService
 
@@ -24,12 +25,31 @@ router = APIRouter()
 def get_health(service: InferenceService = Depends(get_inference_service)) -> HealthResponse:
     """Return a lightweight health response for probes and load balancers."""
 
-    health = service.get_health()
-    return HealthResponse(
+    return _build_health_response(service)
+
+
+@router.get("/health/live", response_model=ProbeResponse)
+def get_liveness() -> ProbeResponse:
+    """Return a liveness signal for container and pod probes."""
+
+    return ProbeResponse(
+        status="ok",
         service="churnops-inference-api",
         version=__version__,
-        **health,
     )
+
+
+@router.get("/health/ready", response_model=HealthResponse)
+def get_readiness(
+    response: Response,
+    service: InferenceService = Depends(get_inference_service),
+) -> HealthResponse:
+    """Return a readiness signal for traffic routing and rollout checks."""
+
+    health_response = _build_health_response(service)
+    if not service.is_ready():
+        response.status_code = 503
+    return health_response
 
 
 @router.get("/v1/model/metadata", response_model=ModelMetadataResponse)
@@ -91,4 +111,15 @@ def predict_churn(
             )
             for prediction in predictions
         ],
+    )
+
+
+def _build_health_response(service: InferenceService) -> HealthResponse:
+    """Build a stable health payload shared by descriptive and readiness routes."""
+
+    health = service.get_health()
+    return HealthResponse(
+        service="churnops-inference-api",
+        version=__version__,
+        **health,
     )

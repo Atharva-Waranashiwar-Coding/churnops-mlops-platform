@@ -20,14 +20,17 @@ RUN pip install --no-cache-dir .
 
 FROM python:3.11-slim AS runtime
 
+ARG APP_UID=10001
+ARG APP_GID=10001
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:${PATH}" \
     CHURNOPS_CONFIG=/app/configs/base.yaml
 
-RUN groupadd --system churnops \
-    && useradd --system --gid churnops --create-home --home-dir /home/churnops churnops
+RUN groupadd --system --gid "${APP_GID}" churnops \
+    && useradd --system --uid "${APP_UID}" --gid churnops --create-home --home-dir /home/churnops churnops
 
 WORKDIR /app
 
@@ -43,7 +46,7 @@ USER churnops
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD python -c "import os, urllib.request; port=os.environ.get('CHURNOPS_INFERENCE_PORT', '8000'); urllib.request.urlopen(f'http://127.0.0.1:{port}/health', timeout=3)"
+  CMD python -c "import os, urllib.request; port=os.environ.get('CHURNOPS_INFERENCE_PORT', '8000'); urllib.request.urlopen(f'http://127.0.0.1:{port}/health/live', timeout=3)"
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["churnops-serve"]
