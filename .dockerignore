@@ -1,0 +1,17 @@
+.git
+.pytest_cache
+.venv
+__pycache__
+*.pyc
+.DS_Store
+artifacts/*
+!artifacts/.gitignore
+data/raw/*
+!data/raw/.gitignore
+data/processed/*
+!data/processed/.gitignore
+tests
+monitoring
+mlruns
+mlartifacts
+.env

@@ -1,0 +1,227 @@
+x-churnops-image: &churnops-image
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: churnops/inference-api:local
+
+x-airflow-image: &airflow-image
+  build:
+    context: .
+    dockerfile: docker/airflow/Dockerfile
+  image: churnops/airflow:local
+
+x-churnops-volumes: &churnops-volumes
+  - ./artifacts:/app/artifacts
+  - ./configs:/app/configs:ro
+  - ./data:/app/data
+
+x-runtime-env: &runtime-env
+  CHURNOPS_CONFIG: ${CHURNOPS_CONFIG:-configs/base.yaml}
+  CHURNOPS_DATA_PATH: ${CHURNOPS_DATA_PATH:-data/raw/customer_churn.csv}
+  CHURNOPS_TRACKING_URI: ${CHURNOPS_TRACKING_URI:-sqlite:///artifacts/mlflow/mlflow.db}
+  CHURNOPS_REGISTRY_URI: ${CHURNOPS_REGISTRY_URI:-sqlite:///artifacts/mlflow/mlflow.db}
+  CHURNOPS_TRACKING_ARTIFACT_LOCATION: ${CHURNOPS_TRACKING_ARTIFACT_LOCATION:-artifacts/mlflow/artifacts}
+  CHURNOPS_DRIFT_ENABLED: ${CHURNOPS_DRIFT_ENABLED:-true}
+  CHURNOPS_DRIFT_STORAGE_DIR: ${CHURNOPS_DRIFT_STORAGE_DIR:-artifacts/monitoring/drift}
+  CHURNOPS_DRIFT_WINDOW_SIZE: ${CHURNOPS_DRIFT_WINDOW_SIZE:-200}
+  CHURNOPS_DRIFT_MIN_SAMPLES: ${CHURNOPS_DRIFT_MIN_SAMPLES:-100}
+  CHURNOPS_DRIFT_NUMERIC_BIN_COUNT: ${CHURNOPS_DRIFT_NUMERIC_BIN_COUNT:-10}
+  CHURNOPS_DRIFT_CATEGORICAL_TOP_K: ${CHURNOPS_DRIFT_CATEGORICAL_TOP_K:-10}
+  CHURNOPS_DRIFT_PSI_WARNING_THRESHOLD: ${CHURNOPS_DRIFT_PSI_WARNING_THRESHOLD:-0.1}
+  CHURNOPS_DRIFT_PSI_DRIFT_THRESHOLD: ${CHURNOPS_DRIFT_PSI_DRIFT_THRESHOLD:-0.25}
+  CHURNOPS_DRIFT_MIN_DRIFTED_FEATURES: ${CHURNOPS_DRIFT_MIN_DRIFTED_FEATURES:-2}
+  CHURNOPS_DRIFT_RETRAINING_ENABLED: ${CHURNOPS_DRIFT_RETRAINING_ENABLED:-false}
+  CHURNOPS_DRIFT_RETRAINING_BACKEND: ${CHURNOPS_DRIFT_RETRAINING_BACKEND:-airflow_api}
+  CHURNOPS_DRIFT_AIRFLOW_DAG_ID: ${CHURNOPS_DRIFT_AIRFLOW_DAG_ID:-churnops_training_pipeline}
+  CHURNOPS_DRIFT_AIRFLOW_USERNAME: ${CHURNOPS_DRIFT_AIRFLOW_USERNAME:-admin}
+  CHURNOPS_DRIFT_AIRFLOW_PASSWORD: ${CHURNOPS_DRIFT_AIRFLOW_PASSWORD:-admin}
+  CHURNOPS_DRIFT_RETRAINING_COOLDOWN_MINUTES: ${CHURNOPS_DRIFT_RETRAINING_COOLDOWN_MINUTES:-240}
+  CHURNOPS_DRIFT_RETRAINING_REQUEST_TIMEOUT_SECONDS: ${CHURNOPS_DRIFT_RETRAINING_REQUEST_TIMEOUT_SECONDS:-10}
+
+x-airflow-common: &airflow-common
+  <<: *airflow-image
+  profiles:
+    - ops
+  restart: unless-stopped
+  init: true
+  env_file:
+    - .env
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://churnops:churnops@airflow-db:5432/airflow
+    AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+    AIRFLOW__WEBSERVER__RBAC: "true"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+    AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-admin}
+    AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+    AIRFLOW_ADMIN_FIRSTNAME: ${AIRFLOW_ADMIN_FIRSTNAME:-ChurnOps}
+    AIRFLOW_ADMIN_LASTNAME: ${AIRFLOW_ADMIN_LASTNAME:-Admin}
+    AIRFLOW_ADMIN_EMAIL: ${AIRFLOW_ADMIN_EMAIL:-admin@example.com}
+    CHURNOPS_CONFIG: /opt/churnops/${CHURNOPS_CONFIG:-configs/base.yaml}
+    CHURNOPS_DATA_PATH: /opt/churnops/${CHURNOPS_DATA_PATH:-data/raw/customer_churn.csv}
+    CHURNOPS_TRACKING_URI: ${CHURNOPS_TRACKING_URI:-sqlite:////opt/churnops/artifacts/mlflow/mlflow.db}
+    CHURNOPS_REGISTRY_URI: ${CHURNOPS_REGISTRY_URI:-sqlite:////opt/churnops/artifacts/mlflow/mlflow.db}
+    CHURNOPS_TRACKING_ARTIFACT_LOCATION: ${CHURNOPS_TRACKING_ARTIFACT_LOCATION:-/opt/churnops/artifacts/mlflow/artifacts}
+    CHURNOPS_ORCHESTRATION_WORKSPACE_DIR: ${CHURNOPS_ORCHESTRATION_WORKSPACE_DIR:-/opt/churnops/artifacts/orchestration}
+    CHURNOPS_AIRFLOW_DAG_ID: ${CHURNOPS_AIRFLOW_DAG_ID:-churnops_training_pipeline}
+    CHURNOPS_AIRFLOW_SCHEDULE: ${CHURNOPS_AIRFLOW_SCHEDULE:-0 3 * * 1}
+    CHURNOPS_AIRFLOW_CATCHUP: ${CHURNOPS_AIRFLOW_CATCHUP:-false}
+    CHURNOPS_AIRFLOW_MAX_ACTIVE_RUNS: ${CHURNOPS_AIRFLOW_MAX_ACTIVE_RUNS:-1}
+    CHURNOPS_AIRFLOW_RETRIES: ${CHURNOPS_AIRFLOW_RETRIES:-1}
+    CHURNOPS_AIRFLOW_RETRY_DELAY_MINUTES: ${CHURNOPS_AIRFLOW_RETRY_DELAY_MINUTES:-5}
+  user: "${AIRFLOW_UID:-50000}:0"
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags:ro
+    - ./artifacts:/opt/churnops/artifacts
+    - ./configs:/opt/churnops/configs:ro
+    - ./data:/opt/churnops/data
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    airflow-db:
+      condition: service_healthy
+
+services:
+  inference-api:
+    <<: *churnops-image
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      <<: *runtime-env
+      CHURNOPS_INFERENCE_HOST: ${CHURNOPS_INFERENCE_HOST:-0.0.0.0}
+      CHURNOPS_INFERENCE_PORT: ${CHURNOPS_INFERENCE_PORT:-8000}
+      CHURNOPS_INFERENCE_MODEL_SOURCE: ${CHURNOPS_INFERENCE_MODEL_SOURCE:-local_artifact}
+      CHURNOPS_INFERENCE_PRELOAD_MODEL: ${CHURNOPS_INFERENCE_PRELOAD_MODEL:-true}
+      CHURNOPS_INFERENCE_LOCAL_RUN_ID: ${CHURNOPS_INFERENCE_LOCAL_RUN_ID:-}
+      CHURNOPS_INFERENCE_LOCAL_MODEL_PATH: ${CHURNOPS_INFERENCE_LOCAL_MODEL_PATH:-}
+      CHURNOPS_INFERENCE_MODEL_URI: ${CHURNOPS_INFERENCE_MODEL_URI:-}
+      CHURNOPS_INFERENCE_REGISTERED_MODEL_NAME: ${CHURNOPS_INFERENCE_REGISTERED_MODEL_NAME:-}
+      CHURNOPS_INFERENCE_REGISTERED_MODEL_ALIAS: ${CHURNOPS_INFERENCE_REGISTERED_MODEL_ALIAS:-}
+      CHURNOPS_INFERENCE_REGISTERED_MODEL_VERSION: ${CHURNOPS_INFERENCE_REGISTERED_MODEL_VERSION:-}
+      CHURNOPS_INFERENCE_PREDICTION_THRESHOLD: ${CHURNOPS_INFERENCE_PREDICTION_THRESHOLD:-0.5}
+      CHURNOPS_DRIFT_AIRFLOW_API_URL: ${CHURNOPS_DRIFT_AIRFLOW_API_URL:-http://airflow-webserver:8080/api/v1}
+    ports:
+      - "${CHURNOPS_INFERENCE_PORT:-8000}:${CHURNOPS_INFERENCE_PORT:-8000}"
+    volumes: *churnops-volumes
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    init: true
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - inference-api
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    restart: unless-stopped
+    init: true
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/churnops-inference-observability.json
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+  trainer:
+    <<: *churnops-image
+    profiles:
+      - ops
+    init: true
+    env_file:
+      - .env
+    environment:
+      <<: *runtime-env
+    command: ["churnops-train"]
+    volumes: *churnops-volumes
+
+  mlflow:
+    <<: *churnops-image
+    profiles:
+      - ops
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      <<: *runtime-env
+      MLFLOW_UI_PORT: ${MLFLOW_UI_PORT:-5000}
+    command:
+      - mlflow
+      - ui
+      - --host
+      - 0.0.0.0
+      - --port
+      - ${MLFLOW_UI_PORT:-5000}
+      - --backend-store-uri
+      - ${CHURNOPS_TRACKING_URI:-sqlite:///artifacts/mlflow/mlflow.db}
+    ports:
+      - "${MLFLOW_UI_PORT:-5000}:${MLFLOW_UI_PORT:-5000}"
+    volumes: *churnops-volumes
+
+  airflow-db:
+    image: postgres:16
+    profiles:
+      - ops
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_PASSWORD: churnops
+      POSTGRES_USER: churnops
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U churnops -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+
+  airflow-init:
+    <<: *airflow-common
+    restart: "no"
+    command: ["/opt/churnops/docker/airflow/init.sh"]
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: ["airflow", "scheduler"]
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: ["airflow", "webserver"]
+    ports:
+      - "${AIRFLOW_WEBSERVER_PORT:-8080}:8080"
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  airflow-db-data:
+  airflow-logs:
+  grafana-data:
+  prometheus-data:

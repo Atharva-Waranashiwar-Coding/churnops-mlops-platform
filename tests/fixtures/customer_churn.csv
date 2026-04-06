@@ -1,0 +1,25 @@
+customerID,gender,SeniorCitizen,Partner,Dependents,tenure,PhoneService,MultipleLines,InternetService,OnlineSecurity,OnlineBackup,DeviceProtection,TechSupport,StreamingTV,StreamingMovies,Contract,PaperlessBilling,PaymentMethod,MonthlyCharges,TotalCharges,Churn
+0001-BGQTA,Female,0,Yes,No,1,No,No phone service,DSL,Yes,No,No,Yes,No,No,Month-to-month,Yes,Electronic check,29.85, ,Yes
+0002-GHKLV,Male,0,No,No,34,Yes,No,DSL,Yes,Yes,No,No,No,No,One year,No,Mailed check,56.95,1889.50,No
+0003-MNBVC,Female,0,No,No,2,Yes,No,Fiber optic,No,No,No,No,No,No,Month-to-month,Yes,Electronic check,53.85,108.15,Yes
+0004-PLMKO,Male,0,No,No,45,No,No phone service,DSL,Yes,No,Yes,Yes,No,No,One year,No,Bank transfer (automatic),42.30,1841.40,No
+0005-QWERT,Female,1,No,No,2,Yes,No,Fiber optic,No,No,No,No,Yes,No,Month-to-month,Yes,Electronic check,70.70,151.65,Yes
+0006-ASDFG,Male,1,Yes,No,8,Yes,Yes,Fiber optic,No,Yes,Yes,No,Yes,Yes,Month-to-month,Yes,Credit card (automatic),99.65,820.50,Yes
+0007-ZXCVB,Female,0,Yes,Yes,22,Yes,No,DSL,Yes,Yes,No,Yes,No,No,One year,No,Credit card (automatic),65.20,1465.00,No
+0008-HJIKL,Male,0,No,No,10,Yes,No,DSL,No,No,No,No,No,No,Month-to-month,Yes,Electronic check,49.95,499.50,Yes
+0009-UYTRE,Female,0,Yes,Yes,70,Yes,Yes,Fiber optic,Yes,Yes,Yes,Yes,Yes,Yes,Two year,No,Bank transfer (automatic),109.10,7637.00,No
+0010-POIUY,Male,0,Yes,Yes,63,Yes,Yes,DSL,Yes,Yes,Yes,Yes,Yes,No,Two year,No,Credit card (automatic),79.85,5010.55,No
+0011-LKJHG,Female,1,No,No,4,Yes,No,Fiber optic,No,No,No,No,Yes,Yes,Month-to-month,Yes,Electronic check,89.10,356.40,Yes
+0012-MJNHB,Male,0,Yes,No,58,Yes,Yes,DSL,Yes,Yes,Yes,Yes,No,No,One year,No,Bank transfer (automatic),71.15,4126.70,No
+0013-BVCXZ,Female,0,No,No,5,Yes,No,Fiber optic,No,No,No,No,Yes,No,Month-to-month,Yes,Electronic check,79.75,398.75,Yes
+0014-NMKJI,Male,0,Yes,Yes,72,Yes,Yes,Fiber optic,Yes,Yes,Yes,Yes,Yes,Yes,Two year,No,Credit card (automatic),114.35,8233.20,No
+0015-HGFDS,Female,1,No,No,3,Yes,No,Fiber optic,No,No,Yes,No,No,Yes,Month-to-month,Yes,Electronic check,85.90,257.70,Yes
+0016-TGBNH,Male,0,Yes,Yes,46,Yes,No,DSL,Yes,No,Yes,Yes,No,No,One year,No,Mailed check,58.75,2702.50,No
+0017-YHNJU,Female,0,No,No,1,Yes,No,Fiber optic,No,No,No,No,Yes,Yes,Month-to-month,Yes,Electronic check,95.05,95.05,Yes
+0018-UJMIK,Male,0,Yes,No,55,Yes,Yes,DSL,Yes,Yes,No,Yes,No,No,Two year,No,Bank transfer (automatic),64.40,3542.00,No
+0019-IKOLP,Female,1,No,No,7,Yes,Yes,Fiber optic,No,Yes,No,No,Yes,Yes,Month-to-month,Yes,Electronic check,100.25,701.75,Yes
+0020-OLPKM,Male,0,Yes,Yes,67,Yes,Yes,Fiber optic,Yes,Yes,Yes,Yes,Yes,Yes,Two year,No,Credit card (automatic),105.80,7088.60,No
+0021-QAZWS,Female,0,No,No,11,Yes,No,DSL,No,Yes,No,No,No,No,Month-to-month,Yes,Mailed check,55.15,606.65,Yes
+0022-WSXED,Male,0,Yes,Yes,60,Yes,Yes,DSL,Yes,Yes,Yes,Yes,No,No,Two year,No,Bank transfer (automatic),69.65,4179.00,No
+0023-EDCRF,Female,1,No,No,6,Yes,Yes,Fiber optic,No,No,No,No,Yes,Yes,Month-to-month,Yes,Electronic check,98.45,590.70,Yes
+0024-RFVTG,Male,0,Yes,Yes,52,Yes,No,DSL,Yes,Yes,Yes,Yes,No,No,One year,No,Credit card (automatic),61.95,3221.40,No
