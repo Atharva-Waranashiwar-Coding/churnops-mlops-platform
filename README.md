@@ -1,16 +1,16 @@
 # ChurnOps
 
-ChurnOps is a production-style MLOps project for customer churn prediction. Phase 09 adds drift-aware monitoring and retraining so the system can persist training baselines, compare live inference inputs against them, log drift events, and trigger the existing Airflow retraining workflow when configured thresholds are met.
+ChurnOps is a production-style MLOps project for customer churn prediction. Phase 10 adds a Kubernetes deployment path for the inference service so the existing container, runtime config, metrics, and drift-aware inference behavior can move into a cluster without rewriting the service.
 
-## Phase 09 Scope
+## Phase 10 Scope
 
 - keep the current training, tracking, inference, and containerization layers intact
-- persist a reference input baseline from the training split as part of each training run
-- detect live feature-distribution drift with a simple PSI-based strategy over a rolling inference window
-- write structured drift events and persisted monitor state for operational auditability
-- trigger the existing Airflow training DAG when drift thresholds and cooldown policy allow it
-- keep drift monitoring, inference serving, and orchestration responsibilities separated
-- document the drift lifecycle and local retraining workflow
+- add Kubernetes manifests for the inference service using the existing image and runtime contract
+- support environment-specific runtime configuration through cluster resources rather than image rebuilds
+- keep deployment assets structured so the base workload and overlays stay readable
+- prepare monitoring integration for Prometheus scraping and operator-based clusters
+- tighten runtime readiness semantics for cluster probes and rollouts
+- document how to render, apply, and validate the Kubernetes deployment
 
 ## Repository Layout
 
@@ -23,6 +23,8 @@ ChurnOps is a production-style MLOps project for customer churn prediction. Phas
 ├── artifacts/                # local training outputs (gitignored)
 ├── configs/
 │   └── base.yaml             # default training configuration
+├── deploy/
+│   └── kubernetes/           # base manifests, environment overlays, and monitoring addons
 ├── monitoring/
 │   ├── grafana/              # provisioned dashboards and datasource config
 │   └── prometheus/           # local scrape configuration
@@ -177,7 +179,9 @@ The inference service loads the trained sklearn pipeline behind a dedicated serv
 
 Endpoints:
 
-- `GET /health`: liveness and readiness-style status for the API and model loader
+- `GET /health`: descriptive service and model-loader state
+- `GET /health/live`: liveness probe endpoint for containers and pods
+- `GET /health/ready`: readiness probe endpoint that returns `503` when the preloaded model is unavailable
 - `GET /metrics`: Prometheus scrape endpoint for API and inference metrics
 - `GET /v1/model/metadata`: loaded model source, feature contract, and class-label metadata
 - `POST /v1/predictions`: batch churn prediction endpoint
@@ -394,6 +398,75 @@ Prometheus scrapes the API at `inference-api:8000/metrics`, and Grafana ships wi
 - failure rate
 - prediction request rate
 - predicted output mix
+
+## Kubernetes Deployment
+
+Kubernetes assets now live under `deploy/kubernetes/` and are organized into three layers:
+
+- `base/`: reusable workload primitives for the inference API, including the Deployment, Service, ServiceAccount, and PVC
+- `overlays/staging/` and `overlays/production/`: namespace-scoped runtime config, image tag selection, and resource sizing
+- `addons/monitoring-operator/`: optional ServiceMonitor and Grafana dashboard packaging for clusters that already run Prometheus Operator and Grafana sidecar provisioning
+
+The base Deployment intentionally stays small:
+
+- it runs a single inference replica because drift state and downloaded artifacts currently live on a PVC mounted at `/app/artifacts`
+- it uses the same `CHURNOPS_*` environment variables as Docker and local runs
+- it probes `/health/live` for liveness and `/health/ready` for readiness
+- it keeps metrics available at `/metrics` and exposes the pod through a ClusterIP Service
+
+The staging and production overlays assume the inference service loads its model from MLflow registry rather than from a local artifact baked into the pod. By default they point at namespace-local services:
+
+- `http://mlflow:5000` for MLflow tracking and registry access
+- `http://airflow-webserver:8080/api/v1` for drift-triggered retraining calls
+
+If those services live elsewhere in your cluster, update the relevant `runtime.env` file before applying the overlay.
+
+Render an overlay locally before applying it:
+
+```bash
+make k8s-render K8S_OVERLAY=deploy/kubernetes/overlays/staging
+make k8s-render K8S_OVERLAY=deploy/kubernetes/overlays/production
+```
+
+Apply the staging deployment:
+
+```bash
+kubectl apply -k deploy/kubernetes/overlays/staging
+kubectl rollout status deployment/churnops-inference -n churnops-staging
+```
+
+Apply the production deployment:
+
+```bash
+kubectl apply -k deploy/kubernetes/overlays/production
+kubectl rollout status deployment/churnops-inference -n churnops-production
+```
+
+The Deployment references an optional secret named `churnops-runtime-secrets`. Create it when you need secret-backed runtime settings such as Airflow basic-auth credentials for drift-triggered retraining:
+
+```bash
+kubectl create secret generic churnops-runtime-secrets \
+  --namespace churnops-production \
+  --from-literal=CHURNOPS_DRIFT_AIRFLOW_USERNAME=admin \
+  --from-literal=CHURNOPS_DRIFT_AIRFLOW_PASSWORD=admin
+```
+
+Basic validation after rollout:
+
+```bash
+kubectl get pods,svc,pvc -n churnops-staging
+kubectl port-forward svc/churnops-inference -n churnops-staging 8000:80
+curl -s http://127.0.0.1:8000/health/ready
+curl -s http://127.0.0.1:8000/v1/model/metadata
+curl -s http://127.0.0.1:8000/metrics | head
+```
+
+If you use the production overlay, the optional monitoring addon will also render:
+
+- a `ServiceMonitor` for Prometheus Operator-based scraping
+- a Grafana dashboard ConfigMap labeled for common sidecar-based dashboard discovery
+
+The container image now uses a fixed non-root UID and GID (`10001`) so the Kubernetes pod security context and PVC permissions are deterministic across clusters.
 - churn-probability distribution
 
 The dashboard is loaded automatically at startup and set as the Grafana home dashboard.
